@@ -1,0 +1,110 @@
+{
+  "_doc": "Visual themes. Gameplay stays readable: only colours, background style and particles change. 'unlock' is the endless level that unlocks the theme. bg_style: 0 nebula, 1 grid, 2 waves, 3 stars, 4 rays.",
+  "event_themes": {
+    "galaxy": "galaxy",
+    "fracture": "crystal",
+    "mega_grid": "digital",
+    "void": "void",
+    "chaos": "inferno",
+    "ascension": "celestial"
+  },
+  "rotation_block": 10,
+  "themes": [
+    {
+      "id": "cyber", "unlock": 1, "auto": true, "bg_style": 1,
+      "bg_top": "#0b1030", "bg_bottom": "#03040d", "bg_accent": "#1b2a7a",
+      "grid": "#18214a", "idle": "#2c3d70", "lit": "#5ef7ff", "glow": "#36c9ff",
+      "hub": "#e9fdff", "warn": "#ff4f7a", "particle": "#9ffcff",
+      "cores": ["#ffd34d", "#ff5fa2", "#5effa1", "#b56bff", "#ff8f3d", "#4dd2ff"],
+      "ui_text": "#e6f0ff", "ui_dim": "#7f8bb3", "ui_accent": "#5ef7ff", "panel": "#0d1336"
+    },
+    {
+      "id": "void", "unlock": 1, "auto": false, "bg_style": 0,
+      "bg_top": "#07060d", "bg_bottom": "#000000", "bg_accent": "#20103a",
+      "grid": "#15121f", "idle": "#2d2645", "lit": "#c9b8ff", "glow": "#8c6bff",
+      "hub": "#f3eeff", "warn": "#ff3355", "particle": "#d9ccff",
+      "cores": ["#ffe27a", "#ff6b9a", "#7affc4", "#a98bff", "#ffa25e", "#6bd8ff"],
+      "ui_text": "#ece6ff", "ui_dim": "#7d7499", "ui_accent": "#c9b8ff", "panel": "#0e0b17"
+    },
+    {
+      "id": "ocean", "unlock": 40, "auto": true, "bg_style": 2,
+      "bg_top": "#04233a", "bg_bottom": "#010912", "bg_accent": "#0a4a6e",
+      "grid": "#0b2c40", "idle": "#16465c", "lit": "#3df2d0", "glow": "#1fc7c7",
+      "hub": "#e8fffb", "warn": "#ff6b6b", "particle": "#a8fff0",
+      "cores": ["#ffd166", "#ff70a6", "#70ffb8", "#9d8cff", "#ff9e57", "#62e1ff"],
+      "ui_text": "#e2fbff", "ui_dim": "#6f9aab", "ui_accent": "#3df2d0", "panel": "#06202f"
+    },
+    {
+      "id": "forest", "unlock": 150, "auto": true, "bg_style": 3,
+      "bg_top": "#0a2414", "bg_bottom": "#020a05", "bg_accent": "#1d4a24",
+      "grid": "#10301c", "idle": "#24503a", "lit": "#a6ff70", "glow": "#5ee86a",
+      "hub": "#f1ffe8", "warn": "#ff6f59", "particle": "#d2ffad",
+      "cores": ["#ffd84d", "#ff7ab8", "#70fff0", "#c18cff", "#ffa04d", "#7ad1ff"],
+      "ui_text": "#eaffe1", "ui_dim": "#7a9a80", "ui_accent": "#a6ff70", "panel": "#0b2014"
+    },
+    {
+      "id": "galaxy", "unlock": 100, "auto": true, "bg_style": 3,
+      "bg_top": "#170b33", "bg_bottom": "#03020b", "bg_accent": "#4a1a7a",
+      "grid": "#1f1440", "idle": "#3d2c66", "lit": "#ff9cf5", "glow": "#d36bff",
+      "hub": "#fff0fe", "warn": "#ff4d6d", "particle": "#ffd1fb",
+      "cores": ["#fff07a", "#7af7ff", "#7aff9c", "#ff9c6b", "#c3a6ff", "#ff6bb5"],
+      "ui_text": "#fbeaff", "ui_dim": "#9a85b3", "ui_accent": "#ff9cf5", "panel": "#140a2b"
+    },
+    {
+      "id": "crystal", "unlock": 250, "auto": true, "bg_style": 4,
+      "bg_top": "#0b2230", "bg_bottom": "#020b11", "bg_accent": "#1b5670",
+      "grid": "#12303f", "idle": "#24526a", "lit": "#9ff7ff", "glow": "#5fd8ff",
+      "hub": "#ffffff", "warn": "#ff5c8a", "particle": "#e0feff",
+      "cores": ["#ffe066", "#ff7eb6", "#7dffcb", "#b49bff", "#ffad66", "#7ae7ff"],
+      "ui_text": "#eafcff", "ui_dim": "#7ea3b3", "ui_accent": "#9ff7ff", "panel": "#081c27"
+    },
+    {
+      "id": "digital", "unlock": 400, "auto": true, "bg_style": 1,
+      "bg_top": "#011a0e", "bg_bottom": "#000703", "bg_accent": "#06401f",
+      "grid": "#062614", "idle": "#124027", "lit": "#39ff88", "glow": "#18e070",
+      "hub": "#eafff2", "warn": "#ff5050", "particle": "#b8ffd6",
+      "cores": ["#f6ff5e", "#ff6be1", "#5efff4", "#a98bff", "#ffab4a", "#5ebcff"],
+      "ui_text": "#dcffe9", "ui_dim": "#5f9474", "ui_accent": "#39ff88", "panel": "#02170c"
+    },
+    {
+      "id": "inferno", "unlock": 600, "auto": true, "bg_style": 4,
+      "bg_top": "#2c0b06", "bg_bottom": "#0a0201", "bg_accent": "#6e1d0b",
+      "grid": "#331109", "idle": "#5c2617", "lit": "#ffb03d", "glow": "#ff6a1f",
+      "hub": "#fff4e0", "warn": "#3dd6ff", "particle": "#ffd38a",
+      "cores": ["#fff36b", "#ff4d8d", "#6bffb0", "#c38bff", "#ff8040", "#6bd3ff"],
+      "ui_text": "#fff0e3", "ui_dim": "#b38672", "ui_accent": "#ffb03d", "panel": "#220905"
+    },
+    {
+      "id": "ancient", "unlock": 1000, "auto": true, "bg_style": 2,
+      "bg_top": "#211a0b", "bg_bottom": "#0a0703", "bg_accent": "#4f3b14",
+      "grid": "#2a2110", "idle": "#4f3f22", "lit": "#ffd88a", "glow": "#e8a94a",
+      "hub": "#fff8e8", "warn": "#ff5e5e", "particle": "#ffe9bd",
+      "cores": ["#fff2a8", "#ff8fb1", "#8fffd0", "#b9a3ff", "#ffb070", "#8fd8ff"],
+      "ui_text": "#fff3dc", "ui_dim": "#a8946e", "ui_accent": "#ffd88a", "panel": "#1a1408"
+    },
+    {
+      "id": "celestial", "unlock": 2500, "auto": true, "bg_style": 4,
+      "bg_top": "#0e1b40", "bg_bottom": "#03050f", "bg_accent": "#2a3f8a",
+      "grid": "#16234a", "idle": "#304178", "lit": "#fff4c2", "glow": "#ffd86b",
+      "hub": "#ffffff", "warn": "#ff5c7a", "particle": "#fffbe0",
+      "cores": ["#ffe066", "#ff8fc7", "#8affd8", "#b5a1ff", "#ffb36b", "#8ad8ff"],
+      "ui_text": "#fdf8e6", "ui_dim": "#9ea6c9", "ui_accent": "#fff4c2", "panel": "#0b1533"
+    },
+    {
+      "id": "quantum", "unlock": 5000, "auto": true, "bg_style": 0,
+      "bg_top": "#1b0636", "bg_bottom": "#05010e", "bg_accent": "#4f1394",
+      "grid": "#221043", "idle": "#3f2266", "lit": "#c86bff", "glow": "#9a3dff",
+      "hub": "#f7ecff", "warn": "#5effc4", "particle": "#e6c2ff",
+      "cores": ["#fff36b", "#ff6bb8", "#6bffd8", "#6b9dff", "#ffa86b", "#6be6ff"],
+      "ui_text": "#f5e9ff", "ui_dim": "#9a80b8", "ui_accent": "#c86bff", "panel": "#15052b"
+    },
+    {
+      "id": "monochrome", "unlock": 1, "auto": false, "bg_style": 1,
+      "bg_top": "#151515", "bg_bottom": "#050505", "bg_accent": "#2a2a2a",
+      "grid": "#1f1f1f", "idle": "#4a4a4a", "lit": "#ffffff", "glow": "#bdbdbd",
+      "hub": "#ffffff", "warn": "#ff9e3d", "particle": "#ffffff",
+      "cores": ["#ffd84d", "#4dc3ff", "#ff6b6b", "#7dff7a", "#d18bff", "#ffffff"],
+      "ui_text": "#f2f2f2", "ui_dim": "#8c8c8c", "ui_accent": "#ffffff", "panel": "#111111"
+    }
+  ]
+}

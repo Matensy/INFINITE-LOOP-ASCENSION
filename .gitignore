@@ -1,0 +1,25 @@
+# Godot 4 cache / import data
+.godot/
+*.import.tmp
+/android/
+
+# Build outputs
+build/
+*.apk
+*.aab
+*.idsig
+
+# Signing material must never be committed
+*.keystore
+*.jks
+export_credentials.cfg
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Local test / stress output
+tests/output/

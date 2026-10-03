@@ -1,0 +1,7 @@
+# Normalize EOL for all text files Godot reads.
+* text=auto eol=lf
+*.png binary
+*.ttf binary
+*.otf binary
+*.wav binary
+*.ogg binary
