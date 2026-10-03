@@ -306,8 +306,7 @@ func _on_reset() -> void:
 func _on_solved() -> void:
 	board.interactive = false
 	var p := session.puzzle
-	var origins := p.cores if not p.cores.is_empty() else PackedInt32Array([_last_tap_cell])
-	board.play_victory(origins)
+	board.play_victory(_victory_origins())
 	var boss := bool(p.meta.get("boss", false))
 	Audio.duck(2.2)
 	Audio.play("boss" if boss else "solve")
@@ -315,6 +314,16 @@ func _on_solved() -> void:
 	main.flare(1.4 if boss else 0.9)
 	if not _replaying:
 		_completion = Game.complete(session)
+
+
+## Energy starts at the cores, or at the last tile the player touched.
+func _victory_origins() -> PackedInt32Array:
+	var p := session.puzzle
+	if not p.cores.is_empty():
+		return p.cores
+	if _last_tap_cell >= 0:
+		return PackedInt32Array([_last_tap_cell])
+	return PackedInt32Array()
 
 
 func _on_victory_finished() -> void:
@@ -415,8 +424,7 @@ func _on_replay() -> void:
 		Audio.play("rotate", 1.1)
 	await get_tree().create_timer(0.4).timeout
 	if is_inside_tree():
-		var p := session.puzzle
-		board.play_victory(p.cores if not p.cores.is_empty() else PackedInt32Array([_last_tap_cell]))
+		board.play_victory(_victory_origins())
 		Audio.play("solve")
 
 

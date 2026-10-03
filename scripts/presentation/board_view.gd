@@ -351,7 +351,10 @@ func clear_highlight() -> void:
 ## camera pulse. Emits victory_finished when done (about 1.2 - 2.4 s).
 func play_victory(origins: PackedInt32Array) -> void:
 	var masks := state.masks()
-	var starts := origins
+	var starts := PackedInt32Array()
+	for c in origins:
+		if c >= 0 and c < puzzle.cell_count():
+			starts.append(c)
 	if starts.is_empty():
 		starts = PackedInt32Array([_center_cell()])
 	var dist := Connectivity.distances(puzzle, masks, starts)
