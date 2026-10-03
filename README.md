@@ -67,7 +67,7 @@ tools/build_android.sh release    # precisa da keystore de release (variáveis d
 tools/build_android.sh aab        # Google Play (gradle build)
 ```
 
-Prioridade `arm64-v8a`, APK release ≈ 27 MB. Passo a passo e CI em [docs/BUILD_ANDROID.md](docs/BUILD_ANDROID.md).
+ABIs `arm64-v8a` + `armeabi-v7a` (instala também em aparelhos 32-bit/Android Go), APK debug ≈ 58 MB. Passo a passo e CI em [docs/BUILD_ANDROID.md](docs/BUILD_ANDROID.md).
 
 ## Documentação
 

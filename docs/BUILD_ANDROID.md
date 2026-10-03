@@ -1,6 +1,6 @@
 # Build Android (APK / AAB)
 
-Configuração do projeto: retrato, renderer **GL Compatibility** (celulares intermediários), `arm64-v8a` apenas, permissão `VIBRATE`, ícones adaptativos (`assets/art/`), `quit_on_go_back=false` (o botão voltar navega entre telas).
+Configuração do projeto: retrato, renderer **GL Compatibility** (celulares intermediários), `arm64-v8a` + `armeabi-v7a` (aparelhos 32-bit/Android Go também instalam; no AAB a Play Store entrega só a ABI do aparelho), permissão `VIBRATE`, ícones adaptativos (`assets/art/`), `quit_on_go_back=false` (o botão voltar navega entre telas).
 
 Presets em `export_presets.cfg`:
 
@@ -51,8 +51,8 @@ Segredos do repositório (Settings → Secrets and variables → Actions):
 
 Neste ambiente foram gerados, com os templates oficiais 4.7.1:
 
-- `InfiniteLoopAscension-debug.apk` — 28,9 MB, assinatura v2+v3 verificada (`apksigner verify`), apenas `lib/arm64-v8a`.
-- `InfiniteLoopAscension-release.apk` — 27,1 MB, assinado com keystore de teste.
+- `InfiniteLoopAscension-debug.apk` — 58,2 MB, assinatura v2+v3 verificada (`apksigner verify`), `lib/arm64-v8a` + `lib/armeabi-v7a`.
+- `InfiniteLoopAscension-release.apk` — 27,1 MB só com arm64 (antes de incluir armeabi-v7a), assinado com keystore de teste.
 
 Ambos dentro da meta de tamanho (< 60 MB). O pacote contém `data/*.json`, fontes e scripts compilados; `tests/`, `tools/` e `docs/` ficam de fora. O AAB depende do gradle build (download de dependências do Google Maven), então é gerado pela CI. Não houve dispositivo/emulador neste ambiente: a instalação em aparelho real é o próximo passo (§90, fase 8).
 
