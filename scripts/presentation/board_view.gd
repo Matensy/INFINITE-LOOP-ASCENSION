@@ -60,6 +60,10 @@ var _fx_glow_layer: Layer
 var _fx_layer: Layer
 var _geo: PipeGeometry
 var _pipe_materials: Array[ShaderMaterial] = []
+## Per-cell geometry of resting tiles: [key, points, colours, uvs], rebuilt
+## only when the inputs packed into the key change (see _tile_key).
+var _core_cache: Array = []
+var _glow_cache: Array = []
 var _disc_node: Array = []
 var _disc_inner: Array = []
 var _disc_hub: Array = []
@@ -171,6 +175,7 @@ func show_puzzle(p: Puzzle, board_state: BoardState, play_session: GameSession =
 	particles.clear()
 	_unit = p.topology.apothem() * 2.0
 	_geo = PipeGeometry.for_topology(p.topology)
+	_invalidate_tiles()
 	var cw := _geo.core_width
 	_disc_node = PipeGeometry.disc(0.17 * _unit)
 	_disc_inner = PipeGeometry.disc(0.08 * _unit)
@@ -190,6 +195,7 @@ func show_puzzle(p: Puzzle, board_state: BoardState, play_session: GameSession =
 
 func set_palette(p: Palette) -> void:
 	palette = p
+	_invalidate_tiles()
 	for layer in [_cells_layer, _glow_layer, _tiles_layer, _fx_glow_layer, _fx_layer]:
 		(layer as Layer).queue_redraw()
 
@@ -725,6 +731,46 @@ func _emit_tile(c: int, angle: float, glow: bool, pts: PackedVector2Array, cols:
 			_append(_disc_bead, Transform2D(0.0, tip), styles[k][0], pts, cols, uvs, uv_xf)
 
 
+func _invalidate_tiles() -> void:
+	_core_cache.clear()
+	_glow_cache.clear()
+	if puzzle:
+		_core_cache.resize(puzzle.cell_count())
+		_glow_cache.resize(puzzle.cell_count())
+
+
+## Everything a resting tile's look depends on (besides the palette, which
+## clears the caches): rotation, matched arms, owning core, DARK verdicts
+## and the quantised victory brightness.
+func _tile_key(c: int) -> int:
+	var key := state.mask(c) | ((_matched[c] & 0x3F) << 6)
+	if _power.size() > c:
+		key |= ((_power[c] + 4) & 0xFF) << 12
+	if _dark_good.size() > c:
+		key |= (_dark_good[c] & 0x3F) << 20
+	return key | (roundi(_victory_level(c) * 24.0) << 26)
+
+
+## Appends a resting tile from the cache, rebuilding it when stale.
+func _append_resting(c: int, glow: bool, pts: PackedVector2Array, cols: PackedColorArray, uvs: PackedVector2Array) -> void:
+	var cache := _glow_cache if glow else _core_cache
+	if cache.size() != puzzle.cell_count():
+		_invalidate_tiles()
+		cache = _glow_cache if glow else _core_cache
+	var key := _tile_key(c)
+	var entry = cache[c]
+	if entry == null or int(entry[0]) != key:
+		var tp := PackedVector2Array()
+		var tc := PackedColorArray()
+		var tu := PackedVector2Array()
+		_emit_tile(c, 0.0, glow, tp, tc, tu)
+		entry = [key, tp, tc, tu]
+		cache[c] = entry
+	pts.append_array(entry[1])
+	cols.append_array(entry[2])
+	uvs.append_array(entry[3])
+
+
 func _flush(ci: CanvasItem, pts: PackedVector2Array, cols: PackedColorArray, uvs: PackedVector2Array, tex: Texture2D) -> void:
 	if pts.is_empty():
 		return
@@ -766,7 +812,7 @@ func _paint_glow(ci: CanvasItem) -> void:
 	var uvs := PackedVector2Array()
 	for c in puzzle.cell_count():
 		if _resting(c):
-			_emit_tile(c, 0.0, true, pts, cols, uvs)
+			_append_resting(c, true, pts, cols, uvs)
 	_flush(ci, pts, cols, uvs, _glow_tex)
 
 
@@ -779,7 +825,7 @@ func _paint_tiles(ci: CanvasItem) -> void:
 	var uvs := PackedVector2Array()
 	for c in puzzle.cell_count():
 		if _resting(c):
-			_emit_tile(c, 0.0, false, pts, cols, uvs)
+			_append_resting(c, false, pts, cols, uvs)
 	_flush(ci, pts, cols, uvs, _core_tex)
 	BoardGlyphs.anchor_marks(ci, puzzle, state, session, palette, _unit)
 	BoardGlyphs.link_badges(ci, puzzle, palette, _unit)
