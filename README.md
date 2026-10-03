@@ -4,13 +4,17 @@ Puzzle mobile (Android, retrato) de girar peças e reconstruir redes de energia,
 
 > "Eu achei que tinha entendido o jogo. Agora ele ficou absurdo."
 
-| Menu | Nível 1 | CORE | Hex · DARK |
+| Menu | Nível 1 | CORE | DARK |
 |---|---|---|---|
-| ![menu](docs/screenshots/01_menu.png) | ![l1](docs/screenshots/02_level_1.png) | ![core](docs/screenshots/03_level_12_core.png) | ![hex](docs/screenshots/06_level_444_hex.png) |
+| ![menu](docs/screenshots/01_menu.jpg) | ![l1](docs/screenshots/02_level_1.jpg) | ![core](docs/screenshots/03_level_12_core.jpg) | ![dark](docs/screenshots/04_level_44_dark.jpg) |
 
-| CHAOS (nível 2.500) | Onda de energia na vitória | Resultado | Debug do gerador |
+| Hexágono · DARK | MULTI CORE | CHAOS (nível 2.500) | Onda de energia na vitória |
 |---|---|---|---|
-| ![chaos](docs/screenshots/07_level_2500_chaos.png) | ![victory](docs/screenshots/11_victory_wave.png) | ![results](docs/screenshots/12_results.png) | ![debug](docs/screenshots/13_debug.png) |
+| ![hex](docs/screenshots/06_level_444_hex.jpg) | ![multi](docs/screenshots/05_level_333_multi.jpg) | ![chaos](docs/screenshots/07_level_2500_chaos.jpg) | ![victory](docs/screenshots/11_victory_wave.jpg) |
+
+| Resultado | Configurações | Perfil | Debug do gerador |
+|---|---|---|---|
+| ![results](docs/screenshots/12_results.jpg) | ![settings](docs/screenshots/13_settings.jpg) | ![profile](docs/screenshots/13_profile.jpg) | ![debug](docs/screenshots/13_debug.jpg) |
 
 ## O que já funciona
 
@@ -26,9 +30,11 @@ Puzzle mobile (Android, retrato) de girar peças e reconstruir redes de energia,
 
 **Mobile first** — toque gira (horário), segurar gira (anti-horário), toque duplo fixa a peça, pinça dá zoom, arrastar move a câmera, toque com dois dedos desfaz; safe area, modo canhoto, retrato, botão voltar do Android, haptics.
 
-**Visual e game feel** — renderizador em lotes (sem um Node por peça), linhas neon texturizadas com brilho, animação de mola em cada rotação, faíscas a cada conexão, núcleos pulsando, portais girando, onda de energia que percorre a rede na vitória com partículas e pulso de câmera, 12 temas (Cyber, Void, Ocean, Forest, Galaxy, Crystal, Digital, Inferno, Ancient, Celestial, Quantum, Monochrome) com fundos em shader.
+**Visual e game feel** — interface moderna (fonte Outfit, botões em pílula com degradê, cartões de vidro fosco, ícones vetoriais, interruptores, título com degradê animado, fundo "aurora" em shader); renderizador em lotes (sem um Node por peça) com canos de curvas circulares lisas, pontas arredondadas, brilho aditivo suave e degradê de cor contínuo por vértice; animação de mola em cada rotação, ondas de toque, faíscas a cada conexão, orbes de núcleo pulsando, portais girando, onda de energia que percorre a rede na vitória com partículas e pulso de câmera; 12 temas (Cyber, Void, Ocean, Forest, Galaxy, Crystal, Digital, Inferno, Ancient, Celestial, Quantum, Monochrome).
 
-**Áudio procedural** — todos os efeitos e a música são sintetizados em runtime (zero arquivos de áudio); música em 3 camadas que crescem com a complexidade e com o progresso, resolução musical ao vencer.
+**Estabilidade** — nenhuma thread de GDScript (geração e áudio em fatias de tempo na thread principal, evitando as condições de corrida do Godot 4.x que fechavam o app), log em arquivo, detecção de fechamento inesperado com relatório copiável (Configurações → Diagnóstico) e modo seguro automático depois de falhas repetidas.
+
+**Áudio procedural** — todos os efeitos e a música são sintetizados em runtime (zero arquivos de áudio); música generativa em tempo real com camadas que crescem com a complexidade e com o progresso, resolução musical ao vencer.
 
 **Progressão e persistência** — perfil e estatísticas, 29 conquistas, títulos, estrelas de prestígio, sequência de dias, replay da solução, compartilhamento (texto + imagem), save JSON versionado com checksum SHA-256, backup automático, migração e recuperação de corrupção; cache LRU de fases.
 
@@ -45,7 +51,7 @@ godot --path . -e                   # abre o editor
 ## Testes
 
 ```bash
-tools/run_tests.sh                                                     # 86 testes unitários
+tools/run_tests.sh                                                     # 91 testes unitários
 godot --headless --path . --script res://tests/ui_smoke_test.gd -- --ephemeral-save   # UI de ponta a ponta
 godot --headless --path . --script res://tests/performance/stress_test.gd -- --count=100000
 godot --headless --path . --script res://tools/check_scripts.gd        # compila todos os scripts
@@ -65,7 +71,7 @@ Prioridade `arm64-v8a`, APK release ≈ 27 MB. Passo a passo e CI em [docs/BUILD
 
 ## Documentação
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — módulos, fluxo de dados, renderização, threads
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — módulos, fluxo de dados, renderização, estabilidade e diagnóstico
 - [docs/GENERATOR.md](docs/GENERATOR.md) — pipeline, seeds, códigos, solver, unicidade, anti-repetição
 - [docs/DIFFICULTY.md](docs/DIFFICULTY.md) — curva, DifficultyScore, planner, eventos, adaptação
 - [docs/BUILD_ANDROID.md](docs/BUILD_ANDROID.md) — exportação e assinatura
@@ -74,4 +80,4 @@ Prioridade `arm64-v8a`, APK release ≈ 27 MB. Passo a passo e CI em [docs/BUILD
 
 ## Licenças
 
-Código do projeto: do autor do repositório. Fontes Orbitron e Exo 2: SIL Open Font License 1.1 (`assets/fonts/OFL-*.txt`). Conceito inspirado na mecânica geral de puzzles de rotação; identidade visual, peças, sistemas e código são próprios.
+Código do projeto: do autor do repositório. Fonte Outfit: SIL Open Font License 1.1 (`assets/fonts/OFL-Outfit.txt`). Conceito inspirado na mecânica geral de puzzles de rotação; identidade visual, peças, sistemas e código são próprios.

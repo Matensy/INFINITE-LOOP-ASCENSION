@@ -92,8 +92,9 @@ func save_data(data: Dictionary) -> bool:
 	var dir := DirAccess.open(path.get_base_dir())
 	if dir == null:
 		return false
-	# Keep the last good save as backup before replacing it.
-	if FileAccess.file_exists(path) and not _read(path).is_empty():
+	# Keep the previous save as backup before replacing it (it was validated
+	# when loaded; corrupted files never get this far).
+	if FileAccess.file_exists(path):
 		dir.copy(path, backup_path())
 	if dir.rename(tmp, path) != OK:
 		dir.copy(tmp, path)

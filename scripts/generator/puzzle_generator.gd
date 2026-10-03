@@ -18,75 +18,142 @@ var avoid_features: Array[PackedFloat32Array] = []
 
 var last_report: Dictionary = {}
 
+# Incremental state (begin / step / result). Each step runs exactly one
+# candidate attempt, so callers can spread generation across frames on the
+# main thread without changing the (deterministic) outcome.
+var _request: PuzzleRequest
+var _plan: LevelPlan
+var _rng: SeededRng
+var _current: LevelPlan
+var _attempt := 0
+var _attempts := 0
+var _invalid := 0
+var _rejected_similar := 0
+var _best: Puzzle
+var _best_err := INF
+var _best_analysis: Dictionary = {}
+var _best_solve: Dictionary = {}
+var _elapsed_usec := 0
+var _done := true
+var _result: Puzzle
 
+
+## Generates the whole puzzle synchronously.
 func generate(request: PuzzleRequest) -> Puzzle:
+	begin(request)
+	while not step():
+		pass
+	return result()
+
+
+## Starts an incremental generation.
+func begin(request: PuzzleRequest) -> void:
 	var t0 := Time.get_ticks_usec()
-	var plan := LevelPlanner.plan(request)
-	var rng := SeededRng.new(request.seed)
+	_request = request
+	_plan = LevelPlanner.plan(request)
+	_rng = SeededRng.new(request.seed)
+	_current = _plan
+	_attempt = 0
+	_attempts = 0
+	_invalid = 0
+	_rejected_similar = 0
+	_best = null
+	_best_err = INF
+	_best_analysis = {}
+	_best_solve = {}
+	_result = null
+	_done = false
 	GameLog.info("GENERATOR", "seed=%d level=%d kind=%s target=%.1f mode=%s %dx%d %s" % [
-		request.seed, request.level, request.kind_id(), plan.target, GameMode.id_of(plan.mode),
-		plan.width, plan.height, BoardShapes.shape_name(plan.shape)])
-	var best: Puzzle = null
-	var best_err := INF
-	var best_analysis: Dictionary = {}
-	var best_solve: Dictionary = {}
-	var rejected_similar := 0
-	var invalid := 0
-	var attempts := 0
-	var current := plan
-	for attempt in plan.max_attempts:
-		attempts += 1
-		var cand_rng := rng.fork(attempt + 1)
-		var puzzle := build_candidate(current, cand_rng)
-		if puzzle == null:
-			invalid += 1
-			continue
-		var problem := Validator.structural_errors(puzzle)
-		if problem != "" or not Validator.verify_stored_solution(puzzle):
-			invalid += 1
-			GameLog.error("VALIDATOR", "candidate rejected: %s" % (problem if problem != "" else "stored solution invalid"))
-			continue
-		var solve := _solve_and_disambiguate(puzzle, current, cand_rng)
-		var analysis := DifficultyAnalyzer.analyze(puzzle, solve)
-		var score: float = analysis["score"]
-		var fp := Fingerprint.compute(puzzle)
-		if _is_repeat(fp, puzzle):
-			rejected_similar += 1
-			GameLog.debug("GENERATOR", "attempt %d rejected as repeat" % attempt)
-			continue
-		var err := absf(log(score / plan.target))
-		if current.require_unique and not puzzle.unique:
-			err += 0.6
-		GameLog.debug("DIFFICULTY", "attempt %d score=%.1f target=%.1f err=%.2f" % [attempt, score, plan.target, err])
-		if err < best_err:
-			best_err = err
-			best = puzzle
-			best_analysis = analysis
-			best_solve = solve
-			best.meta["fingerprint"] = fp
-		if err <= plan.tolerance:
-			break
-		if current.require_unique and not puzzle.unique and attempts >= 3:
-			# Uniqueness keeps failing for this layout: relax PERFECT rather
-			# than burn the remaining attempts (bounded generation time).
-			current = current.duplicate_plan()
-			current.require_unique = false
-		var expo := float(DifficultyConfig.value("planner", "expected_tile_exponent", 0.9))
-		var next := LevelPlanner.rescale(current, pow(plan.target / maxf(score, 0.5), 1.0 / expo))
-		if next.width == current.width and next.height == current.height and not (current.require_unique and not puzzle.unique):
-			# The board cannot be steered any further (e.g. maximum size for an
-			# extreme target): keep the best candidate instead of spinning.
-			break
-		current = next
+		request.seed, request.level, request.kind_id(), _plan.target, GameMode.id_of(_plan.mode),
+		_plan.width, _plan.height, BoardShapes.shape_name(_plan.shape)])
+	_elapsed_usec = Time.get_ticks_usec() - t0
 
-	if best == null:
+
+func is_done() -> bool:
+	return _done
+
+
+func result() -> Puzzle:
+	return _result
+
+
+## Runs one candidate attempt. Returns true when the puzzle is finished.
+func step() -> bool:
+	if _done:
+		return true
+	var t0 := Time.get_ticks_usec()
+	var finished := _run_attempt()
+	_attempt += 1
+	if finished or _attempt >= _plan.max_attempts:
+		_finish()
+	_elapsed_usec += Time.get_ticks_usec() - t0
+	if _done and _result:
+		_result.meta["gen_ms"] = snappedf(_elapsed_usec / 1000.0, 0.01)
+		last_report["gen_ms"] = _elapsed_usec / 1000.0
+	return _done
+
+
+## One attempt of the closed loop. Returns true to stop early.
+func _run_attempt() -> bool:
+	var plan := _plan
+	var current := _current
+	_attempts += 1
+	var cand_rng := _rng.fork(_attempt + 1)
+	var puzzle := build_candidate(current, cand_rng)
+	if puzzle == null:
+		_invalid += 1
+		return false
+	var problem := Validator.structural_errors(puzzle)
+	if problem != "" or not Validator.verify_stored_solution(puzzle):
+		_invalid += 1
+		GameLog.error("VALIDATOR", "candidate rejected: %s" % (problem if problem != "" else "stored solution invalid"))
+		return false
+	var solve := _solve_and_disambiguate(puzzle, current, cand_rng)
+	var analysis := DifficultyAnalyzer.analyze(puzzle, solve)
+	var score: float = analysis["score"]
+	var fp := Fingerprint.compute(puzzle)
+	if _is_repeat(fp, puzzle):
+		_rejected_similar += 1
+		GameLog.debug("GENERATOR", "attempt %d rejected as repeat" % _attempt)
+		return false
+	var err := absf(log(score / plan.target))
+	if current.require_unique and not puzzle.unique:
+		err += 0.6
+	GameLog.debug("DIFFICULTY", "attempt %d score=%.1f target=%.1f err=%.2f" % [_attempt, score, plan.target, err])
+	if err < _best_err:
+		_best_err = err
+		_best = puzzle
+		_best_analysis = analysis
+		_best_solve = solve
+		_best.meta["fingerprint"] = fp
+	if err <= plan.tolerance:
+		return true
+	if current.require_unique and not puzzle.unique and _attempts >= 3:
+		# Uniqueness keeps failing for this layout: relax PERFECT rather
+		# than burn the remaining attempts (bounded generation time).
+		current = current.duplicate_plan()
+		current.require_unique = false
+	var expo := float(DifficultyConfig.value("planner", "expected_tile_exponent", 0.9))
+	var next := LevelPlanner.rescale(current, pow(plan.target / maxf(score, 0.5), 1.0 / expo))
+	if next.width == current.width and next.height == current.height and not (current.require_unique and not puzzle.unique):
+		# The board cannot be steered any further (e.g. maximum size for an
+		# extreme target): keep the best candidate instead of spinning.
+		_current = current
+		return true
+	_current = next
+	return false
+
+
+func _finish() -> void:
+	var request := _request
+	var plan := _plan
+	if _best == null:
 		GameLog.warn("GENERATOR", "all attempts failed, using fallback puzzle")
-		best = _fallback(request)
-		best_solve = PuzzleSolver.new(best).solve(2, plan.node_limit)
-		best_analysis = DifficultyAnalyzer.analyze(best, best_solve)
-		best.meta["fingerprint"] = Fingerprint.compute(best)
-
-	var gen_ms := (Time.get_ticks_usec() - t0) / 1000.0
+		_best = _fallback(request)
+		_best_solve = PuzzleSolver.new(_best).solve(2, plan.node_limit)
+		_best_analysis = DifficultyAnalyzer.analyze(_best, _best_solve)
+		_best.meta["fingerprint"] = Fingerprint.compute(_best)
+	var best := _best
 	best.meta.merge({
 		"seed": request.seed,
 		"level": request.level,
@@ -95,28 +162,28 @@ func generate(request: PuzzleRequest) -> Puzzle:
 		"code": SeedManager.make_code(request),
 		"label": request.label,
 		"target": snappedf(plan.target, 0.1),
-		"difficulty": best_analysis.get("score", 1.0),
-		"tier": best_analysis.get("tier", "tutorial"),
-		"min_moves": best_analysis.get("min_moves", 0),
+		"difficulty": _best_analysis.get("score", 1.0),
+		"tier": _best_analysis.get("tier", "tutorial"),
+		"min_moves": _best_analysis.get("min_moves", 0),
 		"theme": plan.theme,
 		"shape": BoardShapes.shape_name(plan.shape),
 		"event": plan.event,
 		"boss": plan.boss,
 		"plan": plan.to_dict(),
-		"analysis": best_analysis,
-		"solver_nodes": best_solve.get("nodes", 0),
-		"solver_limited": best_solve.get("hit_limit", false),
-		"attempts": attempts,
-		"gen_ms": snappedf(gen_ms, 0.01),
+		"analysis": _best_analysis,
+		"solver_nodes": _best_solve.get("nodes", 0),
+		"solver_limited": _best_solve.get("hit_limit", false),
+		"attempts": _attempts,
 	}, true)
 	last_report = {
-		"attempts": attempts, "invalid": invalid, "rejected_similar": rejected_similar,
-		"error": best_err, "gen_ms": gen_ms,
+		"attempts": _attempts, "invalid": _invalid, "rejected_similar": _rejected_similar,
+		"error": _best_err,
 	}
-	GameLog.info("DIFFICULTY", "score=%.1f tier=%s unique=%s attempts=%d %.1fms" % [
-		float(best_analysis.get("score", 0)), str(best_analysis.get("tier", "")), str(best.unique), attempts, gen_ms])
+	GameLog.info("DIFFICULTY", "score=%.1f tier=%s unique=%s attempts=%d" % [
+		float(_best_analysis.get("score", 0)), str(_best_analysis.get("tier", "")), str(best.unique), _attempts])
 	GameLog.info("VALIDATOR", "PASS fingerprint=%s" % best.meta["fingerprint"])
-	return best
+	_result = best
+	_done = true
 
 
 ## Layers 1-5 for one candidate. Returns null for degenerate attempts.

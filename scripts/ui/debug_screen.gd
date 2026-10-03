@@ -17,12 +17,13 @@ var _info: Label
 var _puzzle: Puzzle
 var _state: BoardState
 var _request: PuzzleRequest
-var _batch_task := -1
-var _batch_mutex := Mutex.new()
-var _batch_progress := 0
+var _batch_active := false
+var _batch_next := 0
+var _batch_end := 0
 var _batch_total := 0
 var _batch_report: Dictionary = {}
-var _batch_cancel := false
+var _batch_seen: Dictionary = {}
+var _batch_gen: PuzzleGenerator
 var _progress: ProgressBar
 var _stepping := false
 
@@ -37,7 +38,7 @@ func _ready() -> void:
 	var col := UiKit.vbox(8)
 	root.add_child(col)
 	var header := UiKit.hbox(8)
-	header.add_child(UiKit.icon_button("←", func(): main.back(), 70))
+	header.add_child(UiKit.icon_button("back", func(): main.back(), 70))
 	var t := UiKit.title("DEBUG GENERATOR", 30, p.ui_accent)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(t)
@@ -93,9 +94,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	GameLog.sink = Callable()
-	if _batch_task >= 0:
-		_batch_cancel = true
-		WorkerThreadPool.wait_for_task_completion(_batch_task)
+	GameLog.enabled = OS.is_debug_build()
 
 
 func _form_label(parent: Control, text: String) -> void:
@@ -145,8 +144,6 @@ func _options(parent: Control, label: String, items: Array) -> OptionButton:
 
 func _append_log(line: String) -> void:
 	if not is_inside_tree():
-		return
-	if OS.get_thread_caller_id() != OS.get_main_thread_id():
 		return
 	_log.text += line + "\n"
 	_log.scroll_vertical = _log.get_line_count()
@@ -280,73 +277,56 @@ func _on_telemetry() -> void:
 	_append_log("[TELEMETRY] " + JSON.stringify(Telemetry.summary(Save.data)))
 
 
+## Batch generation, time-sliced on the main thread (no worker threads).
 func _on_batch(count: int) -> void:
-	if _batch_task >= 0:
-		_batch_cancel = true
+	if _batch_active:
+		_batch_active = false
+		_append_log("[BATCH] cancelled")
+		_progress.visible = false
 		return
-	_batch_cancel = false
-	_batch_progress = 0
+	_batch_active = true
+	_batch_next = int(_level.value)
+	_batch_end = _batch_next + count
 	_batch_total = count
+	_batch_report = {"generated": 0, "valid": 0, "invalid": 0, "duplicate": 0, "diff": 0.0, "ms": 0.0}
+	_batch_seen = {}
+	_batch_gen = PuzzleGenerator.new()
 	_progress.visible = true
 	_progress.max_value = count
-	var start := int(_level.value)
-	_append_log("[BATCH] generating %d puzzles from level %d (tap again to cancel)" % [count, start])
-	_batch_task = WorkerThreadPool.add_task(_batch_worker.bind(start, count), true, "debug batch")
-	set_process(true)
-
-
-func _batch_worker(start: int, count: int) -> void:
-	var gen := PuzzleGenerator.new()
-	var seen := {}
-	var valid := 0
-	var invalid := 0
-	var duplicates := 0
-	var total_ms := 0.0
-	var total_diff := 0.0
-	var done := 0
-	for i in count:
-		if _batch_cancel:
-			break
-		var req := SeedManager.level_request(start + i)
-		var t0 := Time.get_ticks_usec()
-		var p := gen.generate(req)
-		total_ms += (Time.get_ticks_usec() - t0) / 1000.0
-		if Validator.structural_errors(p) == "" and Validator.verify_stored_solution(p):
-			valid += 1
-		else:
-			invalid += 1
-		var fp := str(p.meta.get("fingerprint", ""))
-		if seen.has(fp):
-			duplicates += 1
-		seen[fp] = true
-		total_diff += float(p.meta.get("difficulty", 0.0))
-		done += 1
-		_batch_mutex.lock()
-		_batch_progress = done
-		_batch_mutex.unlock()
-	_batch_mutex.lock()
-	_batch_report = {
-		"generated": done, "valid": valid, "invalid": invalid, "duplicate": duplicates,
-		"avg_difficulty": total_diff / maxf(1.0, done), "avg_ms": total_ms / maxf(1.0, done),
-	}
-	_batch_mutex.unlock()
+	_progress.value = 0
+	GameLog.enabled = false
+	_append_log("[BATCH] generating %d puzzles from level %d (tap again to cancel)" % [count, _batch_next])
 
 
 func _process(_delta: float) -> void:
-	if _batch_task < 0:
+	if not _batch_active:
 		return
-	_batch_mutex.lock()
-	var prog := _batch_progress
-	_batch_mutex.unlock()
-	_progress.value = prog
-	if WorkerThreadPool.is_task_completed(_batch_task):
-		WorkerThreadPool.wait_for_task_completion(_batch_task)
-		_batch_task = -1
+	var start := Time.get_ticks_usec()
+	while _batch_next < _batch_end and (Time.get_ticks_usec() - start) < 12000:
+		var t0 := Time.get_ticks_usec()
+		var p := _batch_gen.generate(SeedManager.level_request(_batch_next))
+		_batch_report["ms"] += (Time.get_ticks_usec() - t0) / 1000.0
+		if Validator.structural_errors(p) == "" and Validator.verify_stored_solution(p):
+			_batch_report["valid"] += 1
+		else:
+			_batch_report["invalid"] += 1
+		var fp := str(p.meta.get("fingerprint", ""))
+		if _batch_seen.has(fp):
+			_batch_report["duplicate"] += 1
+		_batch_seen[fp] = true
+		_batch_report["diff"] += float(p.meta.get("difficulty", 0.0))
+		_batch_report["generated"] += 1
+		_batch_next += 1
+	_progress.value = int(_batch_report["generated"])
+	if _batch_next >= _batch_end:
+		_batch_active = false
 		_progress.visible = false
+		GameLog.enabled = OS.is_debug_build()
 		var r := _batch_report
+		var n := maxf(1.0, float(r["generated"]))
 		_append_log("Generated: %d\nValid: %d\nInvalid: %d\nDuplicate: %d\nAverage Difficulty: %.1f\nAverage Generation Time: %.1fms" % [
-			int(r.get("generated", 0)), int(r.get("valid", 0)), int(r.get("invalid", 0)), int(r.get("duplicate", 0)),
-			float(r.get("avg_difficulty", 0.0)), float(r.get("avg_ms", 0.0))])
+			int(r["generated"]), int(r["valid"]), int(r["invalid"]), int(r["duplicate"]),
+			float(r["diff"]) / n, float(r["ms"]) / n])
 
 
 func on_back() -> bool:

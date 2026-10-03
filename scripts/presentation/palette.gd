@@ -15,6 +15,10 @@ var bg_style := 0
 var grid := Color("#18214a")
 var idle := Color("#2c3d70")
 var lit := Color("#5ef7ff")
+## Second stop of the energy gradient that sweeps across the board.
+var lit2 := Color("#a78bfa")
+## Colour of pipes that carry no energy yet.
+var pipe_idle := Color(0.9, 0.93, 1.0, 0.3)
 var glow := Color("#36c9ff")
 var hub := Color("#e9fdff")
 var warn := Color("#ff4f7a")
@@ -24,6 +28,8 @@ var ui_text := Color("#e6f0ff")
 var ui_dim := Color("#7f8bb3")
 var ui_accent := Color("#5ef7ff")
 var panel := Color("#0d1336")
+## Approximate colour behind the board, used to flatten translucent strokes.
+var surface := Color("#070a1e")
 var high_contrast := false
 var colorblind := false
 
@@ -38,6 +44,7 @@ static func from_theme(theme: Dictionary, high_contrast_mode: bool = false, colo
 	p.grid = ThemeCatalog.color(theme, "grid", p.grid)
 	p.idle = ThemeCatalog.color(theme, "idle", p.idle)
 	p.lit = ThemeCatalog.color(theme, "lit", p.lit)
+	p.lit2 = ThemeCatalog.color(theme, "lit2", p.lit.lerp(p.lit.inverted(), 0.25))
 	p.glow = ThemeCatalog.color(theme, "glow", p.glow)
 	p.hub = ThemeCatalog.color(theme, "hub", p.hub)
 	p.warn = ThemeCatalog.color(theme, "warn", p.warn)
@@ -49,7 +56,10 @@ static func from_theme(theme: Dictionary, high_contrast_mode: bool = false, colo
 	p.panel = ThemeCatalog.color(theme, "panel", p.panel)
 	p.high_contrast = high_contrast_mode
 	p.colorblind = colorblind_mode
+	p.pipe_idle = Color(p.ui_text.lerp(p.lit, 0.12), 0.3)
 	if high_contrast_mode:
+		p.pipe_idle = Color(1, 1, 1, 0.55)
+		p.lit2 = p.lit2.lerp(Color.WHITE, 0.35)
 		p.idle = p.idle.lerp(Color(0.62, 0.62, 0.68), 0.55)
 		p.lit = p.lit.lerp(Color.WHITE, 0.35)
 		p.grid = p.grid.lerp(Color(0.5, 0.5, 0.55), 0.35)
@@ -61,7 +71,18 @@ static func from_theme(theme: Dictionary, high_contrast_mode: bool = false, colo
 		for c in CVD_CORES:
 			p.cores.append(Color(c))
 		p.warn = Color("#CC79A7")
+	p.surface = p.bg_bottom.lerp(p.bg_top, 0.45)
 	return p
+
+
+## Opaque equivalent of a translucent colour over the board surface, so
+## overlapping strokes never show darker or brighter seams.
+func solid(c: Color) -> Color:
+	if c.a >= 1.0:
+		return c
+	var o := surface.lerp(Color(c, 1.0), clampf(c.a, 0.0, 1.0))
+	o.a = 1.0
+	return o
 
 
 func core_color(index: int) -> Color:

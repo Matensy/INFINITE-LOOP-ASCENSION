@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://c2ui0berhadjg"
-path="res://.godot/imported/Exo2-Regular.woff2-f0b50020c6fc319d98474899e6e89233.fontdata"
+uid="uid://bxeiknuksijvw"
+path="res://.godot/imported/Outfit-SemiBold.woff2-6ed7325180230e580d661651e0e39d6e.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/Exo2-Regular.woff2"
-dest_files=["res://.godot/imported/Exo2-Regular.woff2-f0b50020c6fc319d98474899e6e89233.fontdata"]
+source_file="res://assets/fonts/Outfit-SemiBold.woff2"
+dest_files=["res://.godot/imported/Outfit-SemiBold.woff2-6ed7325180230e580d661651e0e39d6e.fontdata"]
 
 [params]
 

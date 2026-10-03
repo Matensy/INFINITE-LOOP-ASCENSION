@@ -23,6 +23,8 @@ var _history: Array[String] = []
 
 func _ready() -> void:
 	UiKit.full_rect(self)
+	# Every screen passes tr() output; never re-translate node texts.
+	auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	background = ColorRect.new()
 	UiKit.full_rect(background)
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -83,9 +85,14 @@ func back() -> void:
 
 
 func toast(text: String, seconds: float = 2.2, color: Color = Color(0, 0, 0, 0)) -> void:
-	var panel := UiKit.panel()
+	var panel := PanelContainer.new()
+	var st := UiTheme.box(Color(Themes.palette.panel.lerp(Color.BLACK, 0.2), 0.94), Color(1, 1, 1, 0.1), 1, 34, 30, 18)
+	st.shadow_color = Color(0, 0, 0, 0.4)
+	st.shadow_size = 18
+	panel.add_theme_stylebox_override("panel", st)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var lbl := UiKit.label(text, 26, color if color.a > 0.0 else Themes.palette.ui_text)
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var lbl := UiKit.label(text, 25, color if color.a > 0.0 else Themes.palette.ui_text, UiTheme.semi_font())
 	panel.add_child(lbl)
 	panel.modulate.a = 0.0
 	_toast_box.add_child(panel)
@@ -106,6 +113,8 @@ func _on_theme(p: Palette) -> void:
 	_bg_material.set_shader_parameter("top_color", p.bg_top)
 	_bg_material.set_shader_parameter("bottom_color", p.bg_bottom)
 	_bg_material.set_shader_parameter("accent_color", p.bg_accent)
+	_bg_material.set_shader_parameter("glow_a", p.lit)
+	_bg_material.set_shader_parameter("glow_b", p.lit2)
 	_bg_material.set_shader_parameter("style", p.bg_style)
 	_apply_effects()
 
@@ -152,7 +161,7 @@ func _handle_back() -> void:
 	if current and current.has_method("on_back") and current.on_back():
 		return
 	if current_name == "menu":
-		Save.flush()
+		Save.shutdown()
 		get_tree().quit()
 	else:
 		back()

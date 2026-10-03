@@ -12,9 +12,10 @@ var session: GameSession
 var board: BoardView
 
 var _title: Label
-var _subtitle: Label
+var _chips: HBoxContainer
 var _timer_label: Label
 var _moves_label: Label
+var _moves_caption: Label
 var _hint_btn: Button
 var _undo_btn: Button
 var _loading: Label
@@ -26,6 +27,11 @@ var _last_tap_cell := -1
 var _replaying := false
 var _completion: Dictionary = {}
 var _load_t := 0.0
+var _replay_state: BoardState
+var _replay_index := 0
+var _replay_wait := 0.0
+var _replay_last_t := 0.0
+var _replay_scale := 1.0
 
 
 func _ready() -> void:
@@ -44,26 +50,29 @@ func _ready() -> void:
 func _build_ui() -> void:
 	var p := Themes.palette
 	var safe := UiKit.safe_margins(get_viewport())
-	var root := UiKit.margin(null, 18 + int(safe.position.x), 14 + int(safe.position.y), 18 + int(safe.size.x), 14 + int(safe.size.y))
+	var root := UiKit.margin(null, 22 + int(safe.position.x), 20 + int(safe.position.y), 22 + int(safe.size.x), 22 + int(safe.size.y))
 	UiKit.full_rect(root)
 	add_child(root)
-	var col := UiKit.vbox(8)
+	var col := UiKit.vbox(10)
 	root.add_child(col)
 
-	var top := UiKit.hbox(10)
-	top.custom_minimum_size = Vector2(0, 112)
-	var menu_btn := UiKit.icon_button("≡", _open_pause, 88)
-	top.add_child(menu_btn)
-	var titles := UiKit.vbox(0)
+	var top := UiKit.hbox(12)
+	top.custom_minimum_size = Vector2(0, 108)
+	var pause_btn := UiKit.icon_button("pause", _open_pause, 80)
+	pause_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(pause_btn)
+	var titles := UiKit.vbox(6)
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_title = UiKit.title("", 38, p.ui_text)
-	_subtitle = UiKit.label("", 20, p.ui_dim)
-	_subtitle.max_lines_visible = 2
+	titles.alignment = BoxContainer.ALIGNMENT_CENTER
+	_title = UiKit.title("", 40, p.ui_text)
 	titles.add_child(_title)
-	titles.add_child(_subtitle)
+	_chips = UiKit.hbox(8)
+	_chips.alignment = BoxContainer.ALIGNMENT_CENTER
+	titles.add_child(_chips)
 	top.add_child(titles)
-	_timer_label = UiKit.label("", 26, p.ui_text, UiTheme.bold_font())
-	_timer_label.custom_minimum_size = Vector2(88, 0)
+	_timer_label = UiKit.label("", 24, p.ui_text, UiTheme.semi_font())
+	_timer_label.custom_minimum_size = Vector2(80, 0)
+	_timer_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	top.add_child(_timer_label)
 	col.add_child(top)
 
@@ -79,25 +88,26 @@ func _build_ui() -> void:
 	board.two_finger_tapped.connect(_on_two_finger)
 	board.gesture_used.connect(_on_gesture)
 	board.victory_finished.connect(_on_victory_finished)
-	_loading = UiKit.title(tr("GENERATING"), 30, p.ui_dim)
+	_loading = UiKit.label(tr("GENERATING"), 26, Color(p.ui_text, 0.55), UiTheme.semi_font())
 	UiKit.full_rect(_loading)
 	_loading.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	board_holder.add_child(_loading)
 
-	_bottom = UiKit.hbox(12)
-	_bottom.custom_minimum_size = Vector2(0, 110)
-	_hint_btn = UiKit.button(tr("HINT"), _open_hints)
-	_hint_btn.custom_minimum_size = Vector2(150, 96)
-	_undo_btn = UiKit.icon_button("↶", _on_undo, 96)
-	_moves_label = UiKit.label("", 26, p.ui_text, UiTheme.bold_font())
-	_moves_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_moves_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	var pause_btn := UiKit.button(tr("MENU"), _open_pause)
-	pause_btn.custom_minimum_size = Vector2(150, 96)
+	_bottom = UiKit.hbox(16)
+	_bottom.custom_minimum_size = Vector2(0, 112)
+	_bottom.alignment = BoxContainer.ALIGNMENT_CENTER
+	_hint_btn = UiKit.icon_button("hint", _open_hints, 96, p.lit)
+	_undo_btn = UiKit.icon_button("undo", _on_undo, 96)
+	var moves := UiKit.vbox(0)
+	moves.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	moves.alignment = BoxContainer.ALIGNMENT_CENTER
+	_moves_label = UiKit.title("0", 44, p.ui_text)
+	_moves_caption = UiKit.caption(tr("MOVES"), Color(p.ui_text, 0.45), 17, HORIZONTAL_ALIGNMENT_CENTER)
+	moves.add_child(_moves_label)
+	moves.add_child(_moves_caption)
 	_bottom.add_child(_hint_btn)
+	_bottom.add_child(moves)
 	_bottom.add_child(_undo_btn)
-	_bottom.add_child(_moves_label)
-	_bottom.add_child(pause_btn)
 	col.add_child(_bottom)
 	_apply_handedness()
 
@@ -118,6 +128,7 @@ func _apply_handedness() -> void:
 # --- Loading --------------------------------------------------------------------
 
 func load_request(req: PuzzleRequest) -> void:
+	Game.generator.allow_background = false
 	request = req
 	_close_overlay()
 	_loading.visible = true
@@ -151,12 +162,12 @@ func _start(p: Puzzle) -> void:
 	_hint_btn.disabled = request.kind == PuzzleRequest.Kind.CHALLENGE
 	_update_hud()
 	_update_music()
-	if request.kind == PuzzleRequest.Kind.LEVEL:
-		Game.prefetch_next()
 	_show_intros(p)
 
 
 func _process(delta: float) -> void:
+	if _replaying:
+		_tick_replay(delta)
 	if session and not _replaying:
 		session.tick(delta)
 		if _show_timer:
@@ -183,18 +194,20 @@ func _update_hud() -> void:
 			_title.text = "%s %s" % [tr("SEED"), I18n.format_int(request.level)]
 		_:
 			_title.text = "%s %s" % [tr("LEVEL"), I18n.format_int(request.level)]
-	var parts: Array[String] = [tr(GameMode.title_key(p.mode))]
-	if p.unique:
-		parts.append(tr("MODIFIER_PERFECT"))
+	for ch in _chips.get_children():
+		ch.queue_free()
+	var pal := Themes.palette
+	_chips.add_child(UiKit.chip(tr(GameMode.title_key(p.mode)), pal.lit))
 	var event := str(p.meta.get("event", ""))
-	if not p.link_groups.is_empty() and event != "chaos":
-		parts.append(tr("MODIFIER_CHAOS"))
 	if event != "":
-		parts.append(tr("EVENT_" + event.to_upper()))
-	parts.append("%s %d" % [tr("DIFFICULTY"), int(round(session.difficulty()))])
-	parts.append(tr(DifficultyCurve.tier_key(session.difficulty())))
-	_subtitle.text = " · ".join(parts)
-	_moves_label.text = "%s: %d" % [tr("MOVES"), session.moves]
+		_chips.add_child(UiKit.chip(tr("EVENT_" + event.to_upper()), pal.lit2, true))
+	elif p.unique:
+		_chips.add_child(UiKit.chip(tr("MODIFIER_PERFECT"), pal.lit2))
+	elif not p.link_groups.is_empty():
+		_chips.add_child(UiKit.chip(tr("MODIFIER_CHAOS"), pal.lit2))
+	var tier := tr(DifficultyCurve.tier_key(session.difficulty()))
+	_chips.add_child(UiKit.chip("%d · %s" % [int(round(session.difficulty())), tier], Color(pal.ui_text, 0.8)))
+	_moves_label.text = str(session.moves)
 	_timer_label.text = I18n.format_time(session.elapsed) if _show_timer else ""
 	_undo_btn.disabled = not session.can_undo()
 
@@ -314,6 +327,8 @@ func _on_solved() -> void:
 	main.flare(1.4 if boss else 0.9)
 	if not _replaying:
 		_completion = Game.complete(session)
+		if request.kind == PuzzleRequest.Kind.LEVEL:
+			Game.prefetch_next()
 
 
 ## Energy starts at the cores, or at the last tile the player touched.
@@ -332,40 +347,49 @@ func _on_victory_finished() -> void:
 
 
 func _show_results() -> void:
+	# Prefetch the next level only now: a short hitch is harmless here.
+	Game.generator.allow_background = true
 	var p := Themes.palette
-	var box := UiKit.vbox(12)
+	var box := UiKit.vbox(18)
 	var boss := bool(session.puzzle.meta.get("boss", false))
-	box.add_child(UiKit.title(tr("BOSS_DEFEATED") if boss else tr("SOLVED"), 46, p.lit))
+	box.add_child(UiKit.gradient_title(tr("BOSS_DEFEATED") if boss else tr("SOLVED"), 60, p.lit, p.lit2))
+	var sub := UiKit.hbox(8)
+	sub.alignment = BoxContainer.ALIGNMENT_CENTER
+	sub.add_child(UiKit.chip(_title.text, Color(p.ui_text, 0.85)))
+	sub.add_child(UiKit.chip(tr(DifficultyCurve.tier_key(session.difficulty())), p.lit))
 	if session.is_perfect():
-		box.add_child(UiKit.label("✦ " + tr("PERFECT") + " ✦", 26, p.ui_accent))
-	var grid := UiKit.vbox(6)
-	grid.add_child(UiKit.stat_row(_title.text, "", p.ui_dim, p.ui_text))
-	var diff_text := "%d · %s" % [int(round(session.difficulty())), tr(DifficultyCurve.tier_key(session.difficulty()))]
-	var moves_text := "%d  (%s %d)" % [session.moves, tr("MIN"), int(session.puzzle.meta.get("min_moves", 0))]
-	grid.add_child(UiKit.stat_row(tr("DIFFICULTY"), diff_text, p.ui_dim, p.ui_text))
-	grid.add_child(UiKit.stat_row(tr("MOVES"), moves_text, p.ui_dim, p.ui_text))
-	grid.add_child(UiKit.stat_row(tr("TIME"), I18n.format_time(session.elapsed), p.ui_dim, p.ui_text))
-	grid.add_child(UiKit.stat_row(tr("HINTS"), str(session.hints_used), p.ui_dim, p.ui_text))
-	if session.puzzle.unique:
-		grid.add_child(UiKit.stat_row(tr("MISTAKES"), str(session.mistakes), p.ui_dim, p.ui_text))
+		sub.add_child(UiKit.chip("✦ " + tr("PERFECT"), p.lit2, true))
+	box.add_child(sub)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	var min_moves := int(session.puzzle.meta.get("min_moves", 0))
+	grid.add_child(UiKit.stat_tile(str(session.moves), "%s · %s %d" % [tr("MOVES"), tr("MIN"), min_moves], p, p.lit))
+	grid.add_child(UiKit.stat_tile(I18n.format_time(session.elapsed), tr("TIME"), p))
+	grid.add_child(UiKit.stat_tile(str(int(round(session.difficulty()))), tr("DIFFICULTY"), p, p.lit2))
+	grid.add_child(UiKit.stat_tile(str(session.hints_used), tr("HINTS"), p))
 	box.add_child(grid)
 	var ach: PackedStringArray = _completion.get("achievements", PackedStringArray())
-	for id in ach:
-		box.add_child(UiKit.label("🏆 " + tr("ACH_" + id.to_upper()), 24, p.ui_accent))
 	if not ach.is_empty():
 		Audio.play("achievement")
-	var code_lbl := UiKit.label(session.code(), 20, p.ui_dim)
-	box.add_child(code_lbl)
-	var next := UiKit.primary_button(_next_label(), _on_next, p.ui_accent)
-	box.add_child(next)
-	var row := UiKit.hbox(12)
-	for spec in [[tr("REPLAY"), _on_replay], [tr("SHARE"), _on_share], [tr("MENU"), _to_menu]]:
-		var b := UiKit.button(spec[0], spec[1], 84)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(b)
-	var fav := UiKit.icon_button(_fav_symbol(), Callable(), 84)
-	fav.pressed.connect(_on_favorite.bind(fav))
+		var flow := HFlowContainer.new()
+		flow.alignment = FlowContainer.ALIGNMENT_CENTER
+		flow.add_theme_constant_override("h_separation", 8)
+		flow.add_theme_constant_override("v_separation", 8)
+		for id in ach:
+			flow.add_child(UiKit.chip("🏆 " + tr("ACH_" + id.to_upper()), p.lit2))
+		box.add_child(flow)
+	box.add_child(UiKit.caption(session.code(), Color(p.ui_text, 0.35), 17, HORIZONTAL_ALIGNMENT_CENTER))
+	box.add_child(UiKit.primary_button(_next_label(), _on_next, p.lit, p.lit2, 108))
+	var row := UiKit.hbox(6)
+	row.add_child(UiKit.labeled_icon("replay", tr("REPLAY"), _on_replay))
+	row.add_child(UiKit.labeled_icon("share", tr("SHARE"), _on_share))
+	var fav := UiKit.labeled_icon(_fav_icon(), tr("FAVORITE"), Callable())
+	var fav_btn: Button = fav.get_child(0)
+	fav_btn.pressed.connect(_on_favorite.bind(fav_btn))
 	row.add_child(fav)
+	row.add_child(UiKit.labeled_icon("grid", tr("MENU"), _to_menu))
 	box.add_child(row)
 	_show_overlay(box, false)
 
@@ -396,36 +420,49 @@ func _on_next() -> void:
 
 
 ## Replays every recorded move from the scrambled start, compressed into a
-## few seconds, then shows the victory sequence again.
+## few seconds, then shows the victory sequence again. Driven from _process
+## (no coroutines that could outlive the screen).
 func _on_replay() -> void:
 	_close_overlay()
 	_replaying = true
-	var state := BoardState.new(session.puzzle)
-	board.show_puzzle(session.puzzle, state, null)
+	_replay_state = BoardState.new(session.puzzle)
+	board.show_puzzle(session.puzzle, _replay_state, null)
 	board.interactive = false
-	var count := session.replay_cells.size()
 	var total := session.elapsed if session.elapsed > 0.0 else 1.0
-	var scale := minf(1.0, REPLAY_MAX_SECONDS / total)
-	var last_t := 0.0
-	for i in count:
-		var t := session.replay_times[i] * scale
-		var wait := clampf(t - last_t, 0.03, 0.6)
-		last_t = t
-		await get_tree().create_timer(wait).timeout
-		if not is_inside_tree():
-			return
-		var cell := session.replay_cells[i]
-		if cell < 0:
-			state.reset()
-			board.refresh()
-			continue
-		var changed := state.rotate(cell, session.replay_steps[i])
-		board.animate_rotation(changed, session.replay_steps[i])
-		Audio.play("rotate", 1.1)
-	await get_tree().create_timer(0.4).timeout
-	if is_inside_tree():
+	_replay_scale = minf(1.0, REPLAY_MAX_SECONDS / total)
+	_replay_index = 0
+	_replay_wait = 0.35
+	_replay_last_t = 0.0
+
+
+func _tick_replay(delta: float) -> void:
+	if _replay_state == null:
+		return
+	_replay_wait -= delta
+	if _replay_wait > 0.0:
+		return
+	var count := session.replay_cells.size()
+	if _replay_index >= count:
+		_replay_state = null
 		board.play_victory(_victory_origins())
 		Audio.play("solve")
+		return
+	var i := _replay_index
+	_replay_index += 1
+	var cell := session.replay_cells[i]
+	if cell < 0:
+		_replay_state.reset()
+		board.refresh()
+	else:
+		var changed := _replay_state.rotate(cell, session.replay_steps[i])
+		board.animate_rotation(changed, session.replay_steps[i])
+		Audio.play("rotate", 1.1)
+	if _replay_index < count:
+		var t := session.replay_times[_replay_index] * _replay_scale
+		_replay_wait = clampf(t - _replay_last_t, 0.03, 0.6)
+		_replay_last_t = t
+	else:
+		_replay_wait = 0.4
 
 
 func _on_share() -> void:
@@ -437,15 +474,15 @@ func _on_share() -> void:
 	main.toast(tr("SHARE_COPIED") + ("\n" + path if path != "" else ""), 2.5)
 
 
-func _fav_symbol() -> String:
-	return "★" if Game.is_favorite(session.code()) else "☆"
+func _fav_icon() -> String:
+	return "star_fill" if Game.is_favorite(session.code()) else "star"
 
 
 func _on_favorite(button: Button = null) -> void:
 	var now := Game.toggle_favorite(session.code())
 	main.toast(tr("FAVORITE_ADDED") if now else tr("FAVORITE_REMOVED"), 1.4)
-	if button:
-		button.text = _fav_symbol()
+	if button and button.has_meta("icon"):
+		(button.get_meta("icon") as VectorIcon).set_icon(_fav_icon())
 
 
 func _save_share_image() -> String:
@@ -478,9 +515,17 @@ func _open_hints() -> void:
 		return
 	var p := Themes.palette
 	var box := UiKit.vbox(12)
-	box.add_child(UiKit.title(tr("HINT"), 38, p.ui_accent))
+	var head := UiKit.hbox(12)
+	head.alignment = BoxContainer.ALIGNMENT_CENTER
+	var bulb := VectorIcon.new("hint", p.lit)
+	bulb.custom_minimum_size = Vector2(44, 44)
+	head.add_child(bulb)
+	head.add_child(UiKit.title(tr("HINT"), 40, p.ui_text))
+	box.add_child(head)
+	box.add_child(UiKit.label(tr("HINT_HELP"), 21, Color(p.ui_text, 0.55)))
 	for lvl in range(1, HINT_LEVELS + 1):
-		var b := UiKit.button("%d · %s" % [lvl, tr("HINT_%d" % lvl)], _use_hint.bind(lvl), 80)
+		var b := UiKit.button("%d   %s" % [lvl, tr("HINT_%d" % lvl)], _use_hint.bind(lvl), 82)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		box.add_child(b)
 	box.add_child(UiKit.button(tr("CANCEL"), _close_overlay, 72))
 	_show_overlay(box, true)
@@ -517,9 +562,10 @@ func _open_pause() -> void:
 	session.paused = true
 	var p := Themes.palette
 	var box := UiKit.vbox(12)
-	box.add_child(UiKit.title(tr("PAUSED"), 40, p.ui_accent))
-	box.add_child(UiKit.label(session.code(), 20, p.ui_dim))
-	box.add_child(UiKit.primary_button(tr("RESUME"), _close_overlay, p.ui_accent))
+	box.add_child(UiKit.title(tr("PAUSED"), 44, p.ui_text))
+	box.add_child(UiKit.caption(session.code(), Color(p.ui_text, 0.4), 17, HORIZONTAL_ALIGNMENT_CENTER))
+	box.add_child(UiKit.spacer(4))
+	box.add_child(UiKit.primary_button(tr("RESUME"), _close_overlay, p.lit, p.lit2))
 	box.add_child(UiKit.button(tr("RESET"), func():
 		_close_overlay()
 		_on_reset()
@@ -528,7 +574,7 @@ func _open_pause() -> void:
 		DisplayServer.clipboard_set(session.code())
 		main.toast(tr("CODE_COPIED"))
 	))
-	box.add_child(UiKit.button(tr("FAVORITE") + "  " + _fav_symbol(), func():
+	box.add_child(UiKit.button(tr("FAVORITE") + ("  ★" if Game.is_favorite(session.code()) else ""), func():
 		_on_favorite()
 		_close_overlay()
 	))
@@ -543,20 +589,8 @@ func _open_pause() -> void:
 
 func _show_overlay(content: Control, dismissable: bool) -> void:
 	_remove_overlay()
-	var shade := ColorRect.new()
-	shade.color = Color(0, 0, 0, 0.62)
-	UiKit.full_rect(shade)
-	add_child(shade)
-	_overlay = shade
-	shade.set_meta("dismissable", dismissable)
-	var center := CenterContainer.new()
-	UiKit.full_rect(center)
-	shade.add_child(center)
-	var panel := UiKit.panel(content)
-	panel.custom_minimum_size = Vector2(minf(640, get_viewport_rect().size.x - 50), 0)
-	center.add_child(panel)
-	shade.modulate.a = 0.0
-	create_tween().tween_property(shade, "modulate:a", 1.0, 0.15)
+	_overlay = UiKit.modal(self, content)
+	_overlay.set_meta("dismissable", dismissable)
 
 
 func _close_overlay() -> void:
@@ -638,11 +672,11 @@ func _show_boss_card(p: Puzzle) -> void:
 
 func _show_card(title_text: String, body: String) -> void:
 	var p := Themes.palette
-	var box := UiKit.vbox(14)
-	box.add_child(UiKit.title(title_text, 40, p.lit))
-	var lbl := UiKit.label(body, 25, p.ui_text)
+	var box := UiKit.vbox(18)
+	box.add_child(UiKit.gradient_title(title_text, 48, p.lit, p.lit2))
+	var lbl := UiKit.label(body, 25, Color(p.ui_text, 0.85))
 	box.add_child(lbl)
-	box.add_child(UiKit.primary_button(tr("GOT_IT"), _close_overlay, p.ui_accent))
+	box.add_child(UiKit.primary_button(tr("GOT_IT"), _close_overlay, p.lit, p.lit2))
 	_show_overlay(box, true)
 
 
@@ -652,11 +686,15 @@ func _show_card(title_text: String, body: String) -> void:
 ## between puzzles (Controls themselves follow the root Theme automatically).
 func _on_theme_changed(p: Palette) -> void:
 	_title.add_theme_color_override("font_color", p.ui_text)
-	_subtitle.add_theme_color_override("font_color", p.ui_dim)
 	_timer_label.add_theme_color_override("font_color", p.ui_text)
 	_moves_label.add_theme_color_override("font_color", p.ui_text)
-	_loading.add_theme_color_override("font_color", p.ui_dim)
+	_moves_caption.add_theme_color_override("font_color", Color(p.ui_text, 0.45))
+	_loading.add_theme_color_override("font_color", Color(p.ui_text, 0.55))
+	if _hint_btn.has_meta("icon"):
+		(_hint_btn.get_meta("icon") as VectorIcon).color = p.lit
+		(_hint_btn.get_meta("icon") as VectorIcon).queue_redraw()
 	board.set_palette(p)
+	_update_hud()
 
 
 func _on_setting(key: String, _value: Variant) -> void:
@@ -683,6 +721,7 @@ func on_back() -> bool:
 
 
 func on_leave() -> void:
+	Game.generator.allow_background = false
 	if session and not session.solved:
 		Game.store_session(session)
 	Save.flush()

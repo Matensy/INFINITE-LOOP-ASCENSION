@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://b16ucl8bj5mva"
-path="res://.godot/imported/Exo2-Bold.woff2-dd939e45db20d17ee5f5c91803c38ef9.fontdata"
+uid="uid://xm0v68tgqly3"
+path="res://.godot/imported/Outfit-ExtraBold.woff2-f762c8fdc36cea812677781ec5c0a893.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/Exo2-Bold.woff2"
-dest_files=["res://.godot/imported/Exo2-Bold.woff2-dd939e45db20d17ee5f5c91803c38ef9.fontdata"]
+source_file="res://assets/fonts/Outfit-ExtraBold.woff2"
+dest_files=["res://.godot/imported/Outfit-ExtraBold.woff2-f762c8fdc36cea812677781ec5c0a893.fontdata"]
 
 [params]
 

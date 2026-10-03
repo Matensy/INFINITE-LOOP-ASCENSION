@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://dqt6i46f602tg"
-path="res://.godot/imported/Orbitron-Bold.woff2-92b657da3b5813fc767a5f35705e46c4.fontdata"
+uid="uid://dttd0h82gdrcr"
+path="res://.godot/imported/Outfit-Light.woff2-1623c78ecea27acc9b39059f1760189f.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/Orbitron-Bold.woff2"
-dest_files=["res://.godot/imported/Orbitron-Bold.woff2-92b657da3b5813fc767a5f35705e46c4.fontdata"]
+source_file="res://assets/fonts/Outfit-Light.woff2"
+dest_files=["res://.godot/imported/Outfit-Light.woff2-1623c78ecea27acc9b39059f1760189f.fontdata"]
 
 [params]
 

@@ -31,6 +31,8 @@ Game="*res://scripts/core/game_services.gd"
 
 [debug]
 
+file_logging/enable_file_logging=true
+file_logging/max_log_files=6
 gdscript/warnings/integer_division=0
 gdscript/warnings/narrowing_conversion=0
 gdscript/warnings/unused_signal=0

@@ -4,13 +4,21 @@ extends Node
 
 signal settings_changed(key: String, value: Variant)
 
-const SAVE_DELAY := 0.75
+const SAVE_DELAY := 2.0
+const LOCK_PATH := "user://running.lock"
+## After this many unexpected exits in a row, heavy effects are turned off.
+const SAFE_MODE_AFTER := 2
 
 var data: Dictionary = {}
 var store: SaveStore
 var cache: LevelCache
 ## Disabled by `--ephemeral-save` (automated UI tests) so nothing is written.
 var persistent: bool = true
+## True when the previous run ended while the app was in the foreground
+## (crash, freeze kill, ...). Detected with a lock file that is removed
+## whenever the app goes to the background or quits normally.
+var crashed_last_time: bool = false
+var safe_mode_applied: bool = false
 
 var _dirty := false
 var _timer := 0.0
@@ -24,9 +32,39 @@ func _ready() -> void:
 	if persistent:
 		data = store.load_data()
 		cache.load_cache()
+		_check_previous_run()
 	else:
 		data = SaveStore.defaults()
 	GameLog.info("SAVE", "loaded (%s)" % (store.last_load_source if persistent else "ephemeral"))
+
+
+func _check_previous_run() -> void:
+	crashed_last_time = FileAccess.file_exists(LOCK_PATH)
+	var count := int(data.get("crash_count", 0))
+	count = count + 1 if crashed_last_time else 0
+	data["crash_count"] = count
+	if crashed_last_time:
+		GameLog.warn("SAVE", "previous run ended unexpectedly (%d in a row)" % count)
+		# Lost progress protection: a crash may have skipped the last flush.
+		var settings: Dictionary = data["settings"]
+		if count >= SAFE_MODE_AFTER and str(settings.get("effects", "high")) == "high":
+			settings["effects"] = "low"
+			safe_mode_applied = true
+		flush()
+	_write_lock()
+
+
+func _write_lock() -> void:
+	if not persistent:
+		return
+	var f := FileAccess.open(LOCK_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string(str(Time.get_unix_time_from_system()))
+
+
+func _remove_lock() -> void:
+	if persistent and FileAccess.file_exists(LOCK_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(LOCK_PATH))
 
 
 func _process(delta: float) -> void:
@@ -37,9 +75,22 @@ func _process(delta: float) -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST \
-			or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
-		flush()
+	match what:
+		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST:
+			flush()
+			_remove_lock()
+		NOTIFICATION_APPLICATION_FOCUS_OUT:
+			flush()
+		NOTIFICATION_APPLICATION_RESUMED:
+			_write_lock()
+		NOTIFICATION_PREDELETE:
+			_remove_lock()
+
+
+## Clean shutdown path used by the app before quitting.
+func shutdown() -> void:
+	flush()
+	_remove_lock()
 
 
 func mark_dirty() -> void:

@@ -14,7 +14,7 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ futuro
 | Seed | ✅ | `SeededRng`, `SeedManager` |
 | Difficulty | ✅ | `LevelPlanner`, `DifficultyAnalyzer`, `DifficultyCurve` |
 | Infinite levels | ✅ | `Puzzle(N) = Generator(Seed(N), Difficulty(N))` |
-| Touch | ✅ | `BoardView._gui_input` |
+| Touch | ✅ | `BoardGestures` |
 | Basic animations | ✅ | mola, faíscas, onda de vitória, pulso |
 | Save | ✅ | `SaveStore` (versão, checksum, backup, migração) |
 | Android export | ✅ | APK debug/release gerados; AAB via CI |
@@ -53,7 +53,7 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ futuro
 | §27 Acessibilidade (animação, vibração, efeitos, contraste, daltonismo, velocidade, tamanho de UI, canhoto, som) | ✅ — tamanho das peças via zoom |
 | §33 Haptics | ✅ |
 | §35 Som adaptativo | ✅ |
-| §36–38 UI, HUD, Perfil | ✅ |
+| §36–38 UI, HUD, Perfil | ✅ (redesign moderno: Outfit, pílulas com degradê, vidro fosco, ícones vetoriais) |
 | §56–57 Dificuldade adaptativa sem trapaça | ✅ |
 | §59 Zen | ✅ |
 | §62 Rotation cost | 🟡 toque horário/anti-horário = 1 movimento; custo 180° ⬜ |
@@ -67,11 +67,12 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ futuro
 | §85–86 Telemetria local e logs | ✅ |
 | §87 Segurança | ✅ |
 | §88 Save corruption | ✅ |
+| Estabilidade / crash report | ✅ sem threads de GDScript, log em arquivo, detecção de fechamento inesperado, relatório copiável, modo seguro |
 | §89 i18n | ✅ pt-BR, en-US (estrutura para es/fr/de/ja/ko/zh) |
 
 ## Próximos passos sugeridos
 
-1. Testar em aparelhos reais (checklist em BUILD_ANDROID.md) e ajustar `data/difficulties/difficulty.json` com a telemetria local.
+1. Testar em aparelhos reais (checklist em BUILD_ANDROID.md); se algo fechar, copiar o relatório em Configurações → Diagnóstico. Ajustar `data/difficulties/difficulty.json` com a telemetria local.
 2. Novas peças compatíveis com o solver: One-Way (aresta direcionada na propagação), Double Corner/Bridge (canais por célula), Switch/Timer (estados como variáveis extras).
 3. Tabuleiro toroidal (bordas que dão a volta) como nova dimensão de dificuldade: remove as âncoras de borda e exige busca real.
 4. Servidor opcional para leaderboard do diário e cloud save.

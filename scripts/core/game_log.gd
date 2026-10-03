@@ -35,7 +35,7 @@ static func error(category: String, message: String) -> void:
 
 
 static func _emit(line: String) -> void:
-	if sink.is_valid():
+	if sink.is_valid() and OS.get_thread_caller_id() == OS.get_main_thread_id():
 		sink.call(line)
 	else:
 		print(line)

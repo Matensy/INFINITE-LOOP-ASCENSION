@@ -1,42 +1,29 @@
 class_name GeneratorService
 extends Node
-## Runs puzzle generation on a background thread with an in-memory LRU and
-## the persistent LevelCache. The next level is prefetched while the player
-## solves the current one, so "Next" is usually instant.
+## Schedules puzzle generation on the main thread, one candidate attempt at
+## a time within a per-frame time budget, so the UI keeps animating while a
+## puzzle is built.
+##
+## No GDScript ever runs on a second thread: Godot 4.7 can crash (SIGSEGV)
+## when two threads execute the same not-yet-run GDScript code at once, and
+## the generator shares a lot of code with gameplay (validation, RNG, ...).
 
 signal puzzle_ready(key: String, puzzle: Puzzle)
 
 const MEMORY_ENTRIES := 6
+## Milliseconds of generation work per frame for puzzles the player waits on.
+const URGENT_BUDGET_MS := 12.0
+## Background prefetch budget, used only while `allow_background` is true.
+const BACKGROUND_BUDGET_MS := 4.0
 
 var level_cache: LevelCache
 var last_generation_ms: float = 0.0
+## Screens enable this when a small hitch is harmless (results overlay).
+var allow_background: bool = false
 
-var _thread: Thread
-var _mutex := Mutex.new()
-var _semaphore := Semaphore.new()
-var _quit := false
-var _jobs: Array = []          # [{key, request, avoid}]
-var _done: Array = []          # [{key, puzzle, ms}]
-var _in_flight: Dictionary = {}
+var _jobs: Array = []          # [{key, request, avoid, urgent, gen}]
 var _memory: Dictionary = {}
 var _memory_order: PackedStringArray = PackedStringArray()
-var _threaded := true
-
-
-func _ready() -> void:
-	_threaded = OS.get_processor_count() > 1 and not OS.has_feature("web")
-	if _threaded:
-		_thread = Thread.new()
-		_thread.start(_worker)
-
-
-func _exit_tree() -> void:
-	if _thread:
-		_mutex.lock()
-		_quit = true
-		_mutex.unlock()
-		_semaphore.post()
-		_thread.wait_to_finish()
 
 
 ## Returns the puzzle immediately when cached, otherwise schedules it (first
@@ -53,28 +40,94 @@ func request(req: PuzzleRequest, avoid: Array = []) -> Puzzle:
 ## Warms the cache in the background (lowest priority).
 func prefetch(req: PuzzleRequest) -> void:
 	var key := req.cache_key()
-	if _memory.has(key) or _in_flight.has(key):
+	if _memory.has(key) or _job_index(key) >= 0:
 		return
 	if level_cache and level_cache.get_puzzle(req) != null:
 		return
 	_enqueue(key, req, [], false)
 
 
-## Synchronous generation (debug tools, tests, single-threaded platforms).
+## Synchronous generation (menu decoration, debug tools, tests).
 func generate_now(req: PuzzleRequest, avoid: Array = []) -> Puzzle:
 	var key := req.cache_key()
 	var cached := _cached(key, req)
 	if cached:
 		return cached
-	var p := _generate(req, avoid)
-	_remember(key, p)
-	if level_cache:
-		level_cache.put(req, p)
+	var gen := _make_generator(avoid)
+	var p := gen.generate(req)
+	_store(key, req, p)
 	return p
 
 
 func is_pending(req: PuzzleRequest) -> bool:
-	return _in_flight.has(req.cache_key())
+	return _job_index(req.cache_key()) >= 0
+
+
+func cancel_background() -> void:
+	for i in range(_jobs.size() - 1, -1, -1):
+		if not bool(_jobs[i]["urgent"]):
+			_jobs.remove_at(i)
+
+
+func _process(_delta: float) -> void:
+	if _jobs.is_empty():
+		return
+	var start := Time.get_ticks_usec()
+	var urgent := _next_job(true) >= 0
+	var budget := URGENT_BUDGET_MS if urgent else BACKGROUND_BUDGET_MS
+	if not urgent and not allow_background:
+		return
+	# Always run at least one attempt per frame so progress is guaranteed.
+	while true:
+		var idx := _next_job(urgent)
+		if idx < 0:
+			break
+		var job: Dictionary = _jobs[idx]
+		var gen: PuzzleGenerator = job["gen"]
+		if gen == null:
+			gen = _make_generator(job["avoid"])
+			gen.begin(job["request"])
+			job["gen"] = gen
+		if gen.step():
+			_jobs.remove_at(idx)
+			var p := gen.result()
+			last_generation_ms = float(p.meta.get("gen_ms", 0.0))
+			_store(job["key"], job["request"], p)
+			puzzle_ready.emit(job["key"], p)
+		if (Time.get_ticks_usec() - start) / 1000.0 >= budget:
+			break
+
+
+func _next_job(urgent_only: bool) -> int:
+	for i in _jobs.size():
+		if bool(_jobs[i]["urgent"]):
+			return i
+	if urgent_only:
+		return -1
+	return 0 if not _jobs.is_empty() else -1
+
+
+func _job_index(key: String) -> int:
+	for i in _jobs.size():
+		if _jobs[i]["key"] == key:
+			return i
+	return -1
+
+
+func _enqueue(key: String, req: PuzzleRequest, avoid: Array, urgent: bool) -> void:
+	var idx := _job_index(key)
+	if idx >= 0:
+		if urgent:
+			_jobs[idx]["urgent"] = true
+		return
+	_jobs.append({"key": key, "request": req.duplicate_request(), "avoid": avoid.duplicate(), "urgent": urgent, "gen": null})
+
+
+func _make_generator(avoid: Array) -> PuzzleGenerator:
+	var gen := PuzzleGenerator.new()
+	for fp in avoid:
+		gen.avoid_fingerprints[str(fp)] = true
+	return gen
 
 
 func _cached(key: String, req: PuzzleRequest) -> Puzzle:
@@ -89,75 +142,10 @@ func _cached(key: String, req: PuzzleRequest) -> Puzzle:
 	return null
 
 
-func _enqueue(key: String, req: PuzzleRequest, avoid: Array, urgent: bool) -> void:
-	if not _threaded:
-		var p := _generate(req, avoid)
-		_remember(key, p)
-		puzzle_ready.emit.call_deferred(key, p)
-		return
-	_mutex.lock()
-	if _in_flight.has(key):
-		# Promote an already queued job.
-		if urgent:
-			for i in _jobs.size():
-				if _jobs[i]["key"] == key:
-					var job: Dictionary = _jobs[i]
-					_jobs.remove_at(i)
-					_jobs.push_front(job)
-					break
-		_mutex.unlock()
-		return
-	_in_flight[key] = true
-	var job := {"key": key, "request": req.duplicate_request(), "avoid": avoid.duplicate()}
-	if urgent:
-		_jobs.push_front(job)
-	else:
-		_jobs.push_back(job)
-	_mutex.unlock()
-	_semaphore.post()
-
-
-func _worker() -> void:
-	while true:
-		_semaphore.wait()
-		_mutex.lock()
-		if _quit:
-			_mutex.unlock()
-			return
-		if _jobs.is_empty():
-			_mutex.unlock()
-			continue
-		var job: Dictionary = _jobs.pop_front()
-		_mutex.unlock()
-		var t0 := Time.get_ticks_usec()
-		var p := _generate(job["request"], job["avoid"])
-		var ms := (Time.get_ticks_usec() - t0) / 1000.0
-		_mutex.lock()
-		_done.append({"key": job["key"], "request": job["request"], "puzzle": p, "ms": ms})
-		_mutex.unlock()
-		call_deferred("_deliver")
-
-
-func _generate(req: PuzzleRequest, avoid: Array) -> Puzzle:
-	var gen := PuzzleGenerator.new()
-	for fp in avoid:
-		gen.avoid_fingerprints[str(fp)] = true
-	return gen.generate(req)
-
-
-func _deliver() -> void:
-	_mutex.lock()
-	var done := _done.duplicate()
-	_done.clear()
-	for d in done:
-		_in_flight.erase(d["key"])
-	_mutex.unlock()
-	for d in done:
-		last_generation_ms = d["ms"]
-		_remember(d["key"], d["puzzle"])
-		if level_cache:
-			level_cache.put(d["request"], d["puzzle"])
-		puzzle_ready.emit(d["key"], d["puzzle"])
+func _store(key: String, req: PuzzleRequest, p: Puzzle) -> void:
+	_remember(key, p)
+	if level_cache:
+		level_cache.put(req, p)
 
 
 func _remember(key: String, p: Puzzle) -> void:

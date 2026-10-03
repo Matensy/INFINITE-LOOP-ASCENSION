@@ -3,7 +3,7 @@ extends SceneTree
 ##
 ##   godot --headless --path . --script res://tests/performance/stress_test.gd -- \
 ##       --count=100000 [--start=1] [--step=1] [--shard=0/4] [--sample=log] \
-##       [--no-verify] [--json=res://tests/output/stress.json]
+##       [--no-verify] [--json=res://tests/output/stress.json] [--dump=fingerprints.txt]
 ##
 ## For every puzzle: structural validation, stored-solution validation, an
 ## independent solver pass (unless --no-verify), exact duplicate detection
@@ -39,6 +39,7 @@ func _init() -> void:
 	var verify := true
 	var log_sample := false
 	var json_path := ""
+	var dump_path := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--count="):
 			count = arg.substr(8).to_int()
@@ -56,9 +57,12 @@ func _init() -> void:
 			log_sample = true
 		elif arg.begins_with("--json="):
 			json_path = arg.substr(7)
+		elif arg.begins_with("--dump="):
+			dump_path = arg.substr(7)
 
 	var counter := ErrorCounter.new()
 	OS.add_logger(counter)
+	var dump: FileAccess = FileAccess.open(dump_path, FileAccess.WRITE) if dump_path != "" else null
 	var gen := PuzzleGenerator.new()
 	var fingerprints := {}
 	var stats := {
@@ -103,6 +107,8 @@ func _init() -> void:
 			if stats["invalid_examples"].size() < 10:
 				stats["invalid_examples"].append(level)
 		var fp: String = p.meta["fingerprint"]
+		if dump:
+			dump.store_line("%d %s" % [level, fp])
 		if fingerprints.has(fp):
 			stats["duplicates"] += 1
 			if stats["duplicate_examples"].size() < 10:
@@ -122,6 +128,8 @@ func _init() -> void:
 			print("... %d generated (%.1f ms avg, level %d)" % [stats["generated"], float(stats["total_ms"]) / float(stats["generated"]), level])
 
 	OS.remove_logger(counter)
+	if dump:
+		dump.close()
 	var n := maxi(1, int(stats["generated"]))
 	var report := {
 		"generated": stats["generated"],

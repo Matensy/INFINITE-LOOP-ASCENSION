@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://crb6ovjqt4tm3"
-path="res://.godot/imported/Orbitron-Black.woff2-3fd9a281e9e7e47f75e3c64236ff316c.fontdata"
+uid="uid://d0nhq34ja3v6v"
+path="res://.godot/imported/Outfit-Regular.woff2-29876c35c7dbfdde0c0261175c941810.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/Orbitron-Black.woff2"
-dest_files=["res://.godot/imported/Orbitron-Black.woff2-3fd9a281e9e7e47f75e3c64236ff316c.fontdata"]
+source_file="res://assets/fonts/Outfit-Regular.woff2"
+dest_files=["res://.godot/imported/Outfit-Regular.woff2-29876c35c7dbfdde0c0261175c941810.fontdata"]
 
 [params]
 
