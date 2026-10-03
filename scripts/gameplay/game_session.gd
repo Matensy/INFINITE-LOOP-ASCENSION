@@ -25,12 +25,13 @@ var pinned: PackedByteArray = PackedByteArray()
 ## Gestures used during the session (for achievements like One Handed).
 var gestures: Dictionary = {}
 
-# Undo stack: flattened [cell, steps, ...].
-var _undo: PackedInt32Array = PackedInt32Array()
 # Replay log: parallel arrays.
 var replay_times: PackedFloat32Array = PackedFloat32Array()
 var replay_cells: PackedInt32Array = PackedInt32Array()
 var replay_steps: PackedInt32Array = PackedInt32Array()
+
+# Undo stack: flattened [cell, steps, ...].
+var _undo: PackedInt32Array = PackedInt32Array()
 
 
 func _init(p: Puzzle, req: PuzzleRequest = null) -> void:

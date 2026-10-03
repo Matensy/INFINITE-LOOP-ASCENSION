@@ -78,7 +78,7 @@ func _setup_decoration() -> void:
 	var p := Game.generator.generate_now(req)
 	var solved := BoardState.new(p, p.solution_rotations())
 	_board.palette = Themes.palette
-	_board.set_effects(float(Save.setting("animation_speed", 1.0)), bool(Save.setting("reduce_motion", false)), str(Save.setting("effects", "high")) == "high")
+	_board.apply_user_settings(Save.settings())
 	_board.show_puzzle(p, solved)
 	_board.set_process(true)
 

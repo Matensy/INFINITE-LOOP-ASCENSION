@@ -27,15 +27,10 @@ const SPRING_K := 340.0
 const SPRING_DAMP := 24.0
 const PADDING := 18.0
 
-
-class Layer:
-	extends Node2D
-	var painter: Callable
-
-	func _draw() -> void:
-		if painter.is_valid():
-			painter.call(self)
-
+## Cross-section profiles for textured arm quads: a crisp anti-aliased core
+## and a soft gaussian glow, both batched into single triangle arrays.
+static var _core_tex: ImageTexture
+static var _glow_tex: ImageTexture
 
 var puzzle: Puzzle
 var state: BoardState
@@ -51,20 +46,17 @@ var high_effects: bool = true
 var zoom: float = 1.0
 var pan: Vector2 = Vector2.ZERO
 
+var particles: ParticleField
+
 var _canvas: Node2D
 var _cells_layer: Layer
 var _tiles_layer: Layer
 var _fx_layer: Layer
-var particles: ParticleField
 
 var _fit := 1.0
 var _unit := 1.0
 var _pending_auto_zoom := false
 
-## Cross-section profiles for textured arm quads: a crisp anti-aliased core
-## and a soft gaussian glow, both batched into single triangle arrays.
-static var _core_tex: ImageTexture
-static var _glow_tex: ImageTexture
 var _time := 0.0
 var _anim_angle := PackedFloat32Array()
 var _anim_vel := PackedFloat32Array()
@@ -102,6 +94,16 @@ var _two_finger_moved := false
 var _last_tap_time := -10.0
 var _last_tap_cell := -2
 var _mouse_down := false
+
+
+## Canvas layer whose drawing is delegated to the owning BoardView.
+class Layer:
+	extends Node2D
+	var painter: Callable
+
+	func _draw() -> void:
+		if painter.is_valid():
+			painter.call(self)
 
 
 func _ready() -> void:
@@ -177,6 +179,12 @@ func set_effects(speed: float, reduced: bool, high: bool) -> void:
 	reduce_motion = reduced
 	high_effects = high
 	particles.density = (1.0 if high else 0.45) * (0.4 if reduced else 1.0)
+
+
+## Applies the accessibility / effects settings dictionary from the save.
+func apply_user_settings(settings: Dictionary) -> void:
+	set_effects(float(settings.get("animation_speed", 1.0)), bool(settings.get("reduce_motion", false)),
+			str(settings.get("effects", "high")) == "high")
 
 
 ## Recomputes connection / power state and redraws resting tiles.

@@ -3,7 +3,8 @@ extends RefCounted
 ## Small factory helpers so screens build consistent UI in code.
 
 
-static func label(text: String, size: int = 28, color: Color = Color(0, 0, 0, 0), font: Font = null, align: int = HORIZONTAL_ALIGNMENT_CENTER) -> Label:
+static func label(text: String, size: int = 28, color: Color = Color(0, 0, 0, 0), font: Font = null,
+		align: int = HORIZONTAL_ALIGNMENT_CENTER) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.horizontal_alignment = align

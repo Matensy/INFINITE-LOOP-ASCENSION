@@ -33,6 +33,7 @@ func _ready() -> void:
 	_build_ui()
 	Game.puzzle_ready.connect(_on_puzzle_ready)
 	Save.settings_changed.connect(_on_setting)
+	Themes.theme_changed.connect(_on_theme_changed)
 	var req: PuzzleRequest = Game.pending_request if Game.pending_request else Game.continue_request()
 	Game.pending_request = null
 	load_request(req)
@@ -76,7 +77,7 @@ func _build_ui() -> void:
 	board.cell_double_tapped.connect(_on_cell_double_tapped)
 	board.empty_double_tapped.connect(func(): board.reset_view())
 	board.two_finger_tapped.connect(_on_two_finger)
-	board.gesture_used.connect(func(kind: String): if session: session.gestures[kind] = true)
+	board.gesture_used.connect(_on_gesture)
 	board.victory_finished.connect(_on_victory_finished)
 	_loading = UiKit.title(tr("GENERATING"), 30, p.ui_dim)
 	UiKit.full_rect(_loading)
@@ -143,7 +144,7 @@ func _start(p: Puzzle) -> void:
 		main.toast(tr("PROGRESS_RESTORED"), 1.6)
 	Themes.apply(Themes.resolve_for_puzzle(str(p.meta.get("theme", ""))))
 	board.set_palette(Themes.palette)
-	board.set_effects(float(Save.setting("animation_speed", 1.0)), bool(Save.setting("reduce_motion", false)), str(Save.setting("effects", "high")) == "high")
+	board.apply_user_settings(Save.settings())
 	board.show_puzzle(p, session.state, session)
 	board.interactive = not session.solved
 	_show_timer = bool(Save.setting("show_timer", false)) or request.kind in [PuzzleRequest.Kind.DAILY, PuzzleRequest.Kind.CHALLENGE]
@@ -245,6 +246,11 @@ func _on_cell_tapped(cell: int, steps: int) -> void:
 		Game.store_session(session)
 
 
+func _on_gesture(kind: String) -> void:
+	if session:
+		session.gestures[kind] = true
+
+
 func _on_cell_double_tapped(cell: int) -> void:
 	if session == null or session.solved:
 		return
@@ -325,8 +331,10 @@ func _show_results() -> void:
 		box.add_child(UiKit.label("✦ " + tr("PERFECT") + " ✦", 26, p.ui_accent))
 	var grid := UiKit.vbox(6)
 	grid.add_child(UiKit.stat_row(_title.text, "", p.ui_dim, p.ui_text))
-	grid.add_child(UiKit.stat_row(tr("DIFFICULTY"), "%d · %s" % [int(round(session.difficulty())), tr(DifficultyCurve.tier_key(session.difficulty()))], p.ui_dim, p.ui_text))
-	grid.add_child(UiKit.stat_row(tr("MOVES"), "%d  (%s %d)" % [session.moves, tr("MIN"), int(session.puzzle.meta.get("min_moves", 0))], p.ui_dim, p.ui_text))
+	var diff_text := "%d · %s" % [int(round(session.difficulty())), tr(DifficultyCurve.tier_key(session.difficulty()))]
+	var moves_text := "%d  (%s %d)" % [session.moves, tr("MIN"), int(session.puzzle.meta.get("min_moves", 0))]
+	grid.add_child(UiKit.stat_row(tr("DIFFICULTY"), diff_text, p.ui_dim, p.ui_text))
+	grid.add_child(UiKit.stat_row(tr("MOVES"), moves_text, p.ui_dim, p.ui_text))
 	grid.add_child(UiKit.stat_row(tr("TIME"), I18n.format_time(session.elapsed), p.ui_dim, p.ui_text))
 	grid.add_child(UiKit.stat_row(tr("HINTS"), str(session.hints_used), p.ui_dim, p.ui_text))
 	if session.puzzle.unique:
@@ -614,12 +622,23 @@ func _show_card(title_text: String, body: String) -> void:
 
 # --- Misc ----------------------------------------------------------------------
 
+## HUD labels carry explicit colours; refresh them when the theme changes
+## between puzzles (Controls themselves follow the root Theme automatically).
+func _on_theme_changed(p: Palette) -> void:
+	_title.add_theme_color_override("font_color", p.ui_text)
+	_subtitle.add_theme_color_override("font_color", p.ui_dim)
+	_timer_label.add_theme_color_override("font_color", p.ui_text)
+	_moves_label.add_theme_color_override("font_color", p.ui_text)
+	_loading.add_theme_color_override("font_color", p.ui_dim)
+	board.set_palette(p)
+
+
 func _on_setting(key: String, _value: Variant) -> void:
 	match key:
 		"left_handed":
 			_apply_handedness()
 		"animation_speed", "reduce_motion", "effects":
-			board.set_effects(float(Save.setting("animation_speed", 1.0)), bool(Save.setting("reduce_motion", false)), str(Save.setting("effects", "high")) == "high")
+			board.apply_user_settings(Save.settings())
 		"high_contrast", "colorblind", "theme":
 			if session:
 				Themes.apply(Themes.resolve_for_puzzle(str(session.puzzle.meta.get("theme", ""))), true)

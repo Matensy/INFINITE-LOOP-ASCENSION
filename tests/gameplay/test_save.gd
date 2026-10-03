@@ -76,8 +76,10 @@ func test_migration_from_v1() -> void:
 
 func test_statistics_and_streaks() -> void:
 	var stats := Statistics.defaults()
-	Statistics.record_solve(stats, {"difficulty": 30.0, "moves": 20, "time": 40.0, "hints": 0, "perfect": true, "mode": "loop", "tier": "normal", "day": "2026-10-01", "code": "A"})
-	Statistics.record_solve(stats, {"difficulty": 80.0, "moves": 50, "time": 25.0, "hints": 1, "mode": "core", "tier": "very_hard", "day": "2026-10-02", "code": "B"})
+	Statistics.record_solve(stats, {"difficulty": 30.0, "moves": 20, "time": 40.0, "hints": 0, "perfect": true,
+		"mode": "loop", "tier": "normal", "day": "2026-10-01", "code": "A"})
+	Statistics.record_solve(stats, {"difficulty": 80.0, "moves": 50, "time": 25.0, "hints": 1,
+		"mode": "core", "tier": "very_hard", "day": "2026-10-02", "code": "B"})
 	Statistics.record_solve(stats, {"difficulty": 12.0, "moves": 9, "time": 8.0, "hints": 0, "mode": "loop", "tier": "easy", "day": "2026-10-04"})
 	assert_eq(int(stats["total_solved"]), 3)
 	assert_eq(int(stats["perfect_solves"]), 1)
@@ -92,8 +94,10 @@ func test_statistics_and_streaks() -> void:
 
 func test_achievements() -> void:
 	var save := SaveStore.defaults()
-	Statistics.record_solve(save["stats"], {"difficulty": 200.0, "moves": 10, "time": 12.0, "hints": 0, "mode": "dark", "tier": "insane", "day": "2026-10-03"})
-	var fresh := AchievementSystem.evaluate(save, {"difficulty": 200.0, "hints": 0, "time": 12.0, "perfect": false, "mechanics": ["portal"], "gestures": {}})
+	Statistics.record_solve(save["stats"], {"difficulty": 200.0, "moves": 10, "time": 12.0, "hints": 0,
+		"mode": "dark", "tier": "insane", "day": "2026-10-03"})
+	var fresh := AchievementSystem.evaluate(save, {"difficulty": 200.0, "hints": 0, "time": 12.0, "perfect": false,
+		"mechanics": ["portal"], "gestures": {}})
 	for id in ["first_loop", "first_insane", "first_brutal", "no_hint", "speed_solver", "dark_side", "portal_jumper", "one_handed"]:
 		assert_true(fresh.has(id), "unlocked " + id)
 	assert_false(fresh.has("first_nightmare"))

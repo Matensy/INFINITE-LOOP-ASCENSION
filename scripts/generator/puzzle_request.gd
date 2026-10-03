@@ -92,4 +92,5 @@ static func from_dict(d: Dictionary) -> PuzzleRequest:
 
 ## Stable key for caches.
 func cache_key() -> String:
-	return "%s:%d:%d:%d:%d:%d:%d:%.2f:%d" % [kind_id(), level, seed, bias, force_mode, force_topology, force_shape, force_target, int(uses_progression())]
+	return "%s:%d:%d:%d:%d:%d:%d:%.2f:%d" % [kind_id(), level, seed, bias, force_mode, force_topology,
+			force_shape, force_target, int(uses_progression())]
