@@ -78,7 +78,7 @@ static func _click() -> void:
 		audio.play("ui")
 	var haptics := tree.root.get_node_or_null("Haptics")
 	if haptics:
-		haptics.pulse(6)
+		haptics.pulse_ui()
 
 
 static func vbox(separation: int = 14) -> VBoxContainer:

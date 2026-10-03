@@ -13,6 +13,7 @@ const CHALLENGES := [
 	{"id": "ascension", "target": 520.0},
 ]
 const RECENT_FINGERPRINTS := 40
+const MAX_FAVORITES := 50
 
 var generator: GeneratorService
 ## Request the next screen should open (set by menus).
@@ -217,6 +218,33 @@ func _unlock_themes(data: Dictionary, highest: int) -> void:
 		if int(t.get("unlock", 1)) <= highest and not unlocked.has(id):
 			unlocked.append(id)
 	data["unlocked_themes"] = unlocked
+
+
+## Favourite puzzles are stored as share codes (rebuilt on demand).
+func favorites() -> Array:
+	var save := _save()
+	return save.data.get("favorites", []) if save else []
+
+
+func is_favorite(code: String) -> bool:
+	return favorites().has(code)
+
+
+func toggle_favorite(code: String) -> bool:
+	var save := _save()
+	if save == null or code == "":
+		return false
+	var favs: Array = save.data.get("favorites", [])
+	var now_fav := not favs.has(code)
+	if now_fav:
+		favs.append(code)
+		while favs.size() > MAX_FAVORITES:
+			favs.pop_front()
+	else:
+		favs.erase(code)
+	save.data["favorites"] = favs
+	save.mark_dirty()
+	return now_fav
 
 
 func is_daily_done(label: String) -> bool:

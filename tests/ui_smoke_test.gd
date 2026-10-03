@@ -102,6 +102,8 @@ func _run() -> void:
 	_check(session.solved, "hint 5 solves")
 	await _wait_for(func(): return game._overlay != null, 900)
 	game._on_share()
+	game._on_favorite()
+	_check(_game.is_favorite(game.session.code()), "favourite stored")
 	game._on_replay()
 	_check(await _wait_for(func(): return game._overlay != null and not game._replaying, 1500), "replay finished")
 

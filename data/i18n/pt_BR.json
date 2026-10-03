@@ -226,5 +226,9 @@
   "THEME_ANCIENT": "Ancestral",
   "THEME_CELESTIAL": "Celestial",
   "THEME_QUANTUM": "Quântico",
-  "THEME_MONOCHROME": "Monocromático"
+  "THEME_MONOCHROME": "Monocromático",
+  "FAVORITE": "FAVORITAR",
+  "FAVORITES": "FAVORITOS",
+  "FAVORITE_ADDED": "Adicionado aos favoritos",
+  "FAVORITE_REMOVED": "Removido dos favoritos"
 }

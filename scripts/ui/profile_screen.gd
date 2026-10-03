@@ -60,6 +60,14 @@ func _ready() -> void:
 	if hardest != "":
 		body.add_child(UiKit.button(tr("REPLAY_HARDEST"), _replay_code.bind(hardest), 76))
 
+	var favs: Array = Game.favorites()
+	if not favs.is_empty():
+		body.add_child(UiKit.title("%s  %d" % [tr("FAVORITES"), favs.size()], 30, p.ui_accent))
+		for i in range(favs.size() - 1, maxi(-1, favs.size() - 11), -1):
+			var b := UiKit.button("★  " + str(favs[i]), _replay_code.bind(str(favs[i])), 70)
+			b.add_theme_font_size_override("font_size", 22)
+			body.add_child(b)
+
 	var unlocked: Dictionary = Save.data.get("achievements", {})
 	var defs := AchievementSystem.definitions()
 	body.add_child(UiKit.title("%s  %d/%d" % [tr("ACHIEVEMENTS"), unlocked.size(), defs.size()], 30, p.ui_accent))

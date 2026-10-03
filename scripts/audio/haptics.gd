@@ -34,6 +34,11 @@ func pulse(kind: int) -> void:
 		await get_tree().create_timer(ms / 1000.0).timeout
 
 
+## Light tick for UI buttons (callable without referencing the enum).
+func pulse_ui() -> void:
+	pulse(Kind.UI)
+
+
 func _enabled() -> bool:
 	return bool(_save_setting("haptics", true))
 

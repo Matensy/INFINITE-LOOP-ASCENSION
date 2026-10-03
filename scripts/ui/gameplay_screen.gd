@@ -354,6 +354,9 @@ func _show_results() -> void:
 		var b := UiKit.button(spec[0], spec[1], 84)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(b)
+	var fav := UiKit.icon_button(_fav_symbol(), Callable(), 84)
+	fav.pressed.connect(_on_favorite.bind(fav))
+	row.add_child(fav)
 	box.add_child(row)
 	_show_overlay(box, false)
 
@@ -424,6 +427,17 @@ func _on_share() -> void:
 	DisplayServer.clipboard_set(text)
 	var path := _save_share_image()
 	main.toast(tr("SHARE_COPIED") + ("\n" + path if path != "" else ""), 2.5)
+
+
+func _fav_symbol() -> String:
+	return "★" if Game.is_favorite(session.code()) else "☆"
+
+
+func _on_favorite(button: Button = null) -> void:
+	var now := Game.toggle_favorite(session.code())
+	main.toast(tr("FAVORITE_ADDED") if now else tr("FAVORITE_REMOVED"), 1.4)
+	if button:
+		button.text = _fav_symbol()
 
 
 func _save_share_image() -> String:
@@ -505,6 +519,10 @@ func _open_pause() -> void:
 	box.add_child(UiKit.button(tr("COPY_CODE"), func():
 		DisplayServer.clipboard_set(session.code())
 		main.toast(tr("CODE_COPIED"))
+	))
+	box.add_child(UiKit.button(tr("FAVORITE") + "  " + _fav_symbol(), func():
+		_on_favorite()
+		_close_overlay()
 	))
 	box.add_child(UiKit.button(tr("OBJECTIVE"), func():
 		_close_overlay()
