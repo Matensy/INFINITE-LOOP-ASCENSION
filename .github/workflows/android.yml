@@ -1,13 +1,20 @@
 name: Android build
 
-# Debug APK on every push to main and on demand; signed release APK + AAB
+# Debug APK on every code push and on demand; signed release APK + AAB
 # when the signing secrets are configured (see docs/BUILD_ANDROID.md):
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_ALIAS, ANDROID_KEYSTORE_PASSWORD
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: ["**"]
     tags: ["v*"]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   GODOT_VERSION: "4.7.1"

@@ -37,7 +37,7 @@ keytool -genkeypair -v -keystore release.keystore -alias ila -keyalg RSA -keysiz
 ## CI (GitHub Actions)
 
 - `.github/workflows/ci.yml` — em todo push/PR: compila todos os scripts, roda os testes unitários, o smoke test de UI e um stress test (5.000 níveis + amostragem logarítmica até 10⁹). Relatórios JSON ficam como artefato.
-- `.github/workflows/android.yml` — manual (*Run workflow*), em push para `main`/`master` e em tags `v*`: exporta o APK debug; se os segredos abaixo existirem, também o APK release e o AAB. Os builds ficam como artefato `android-builds`.
+- `.github/workflows/android.yml` — em todo push de código (exceto só docs), manual (*Run workflow*) e em tags `v*`: exporta o APK debug; se os segredos abaixo existirem, também o APK release e o AAB. Os builds ficam como artefato `android-builds`.
 
 Segredos do repositório (Settings → Secrets and variables → Actions):
 
