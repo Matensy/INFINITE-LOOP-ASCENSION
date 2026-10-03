@@ -8,7 +8,7 @@ extends SceneTree
 ## with code 1 on any failure. Engine/script errors raised while a test runs
 ## are captured through a Logger and count as failures.
 
-const SUITES: Array[String] = ["core", "generator", "solver", "gameplay"]
+const SUITES: Array[String] = ["core", "generator", "solver", "gameplay", "performance"]
 
 
 class ErrorCounter:

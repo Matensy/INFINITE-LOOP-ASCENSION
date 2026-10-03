@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7.1"
+
+jobs:
+  test:
+    name: Tests (headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}
+
+      - name: Install Godot
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+          rm godot.zip
+
+      - name: Add Godot to PATH
+        run: echo "$HOME/godot" >> "$GITHUB_PATH"
+
+      - name: Import project
+        run: godot --headless --path . --import || true
+
+      - name: Compile every script
+        run: godot --headless --path . --script res://tools/check_scripts.gd
+
+      - name: Unit tests
+        run: godot --headless --path . --script res://tests/run_tests.gd
+
+      - name: UI smoke test
+        run: godot --headless --path . --script res://tests/ui_smoke_test.gd -- --ephemeral-save
+
+      - name: Generator stress test (5,000 levels + log-sampled up to 10^9)
+        run: |
+          godot --headless --path . --script res://tests/performance/stress_test.gd -- --count=5000 --json=res://tests/output/stress_5000.json
+          godot --headless --path . --script res://tests/performance/stress_test.gd -- --count=300 --sample=log --json=res://tests/output/stress_log.json
+
+      - name: Upload stress reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-reports
+          path: tests/output/*.json
+          if-no-files-found: ignore
